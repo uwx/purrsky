@@ -1,6 +1,6 @@
 const {IOSConfig, withXcodeProject} = require('expo/config-plugins')
 
-const BUILD_PHASE_FILES = ['AppDelegate.swift', 'ViewController.swift']
+const BUILD_PHASE_FILES = ['ClipAppDelegate.swift', 'ViewController.swift']
 
 const withXcodeTarget = (config, {targetName}) => {
   return withXcodeProject(config, config => {
@@ -26,7 +26,7 @@ const withXcodeTarget = (config, {targetName}) => {
     )
 
     const pbxGroup = pbxProject.addPbxGroup([
-      'AppDelegate.swift',
+      'ClipAppDelegate.swift',
       'ViewController.swift',
       'Images.xcassets',
       `${targetName}.entitlements`,

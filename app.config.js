@@ -94,7 +94,11 @@ module.exports = function (_config) {
       ios: {
         supportsTablet: true,
         bundleIdentifier: process.env.WITCHSKY_BUNDLE_ID || 'app.witchsky',
-        appleTeamId: process.env.WITCHSKY_APPLE_TEAM_ID || 'TODO: Xan',
+        // A team id with spaces or punctuation (e.g. a "TODO" placeholder)
+        // makes prebuild write an unquoted DEVELOPMENT_TEAM, which the
+        // CocoaPods project parser cannot read. Omit it when there is none:
+        // signing then comes from Xcode, EAS or the installer.
+        appleTeamId: process.env.WITCHSKY_APPLE_TEAM_ID || undefined,
         buildNumber: IOS_BUILD_NUMBER,
         config: {
           usesNonExemptEncryption: false,

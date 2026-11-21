@@ -49,8 +49,9 @@ jobs:
       # .icon (Icon Composer) asset, and only `ios` gets the .aiff notification
       # sound. Must be set before prebuild, which consumes the config.
       EAS_BUILD_PLATFORM: ios
-      # Without a Team ID the generated project keeps app.config.js's
-      # placeholder. Signing is disabled below, so it is never validated.
+      # app.config.js leaves DEVELOPMENT_TEAM out when this is unset, which
+      # keeps prebuild from writing an unreadable placeholder. Signing is
+      # disabled below, so no team is validated anyway.
       BSKY_IOS_BUILD_NUMBER: ${{ github.run_number }}
       # Lets a dispatch override the bundle identifier, e.g. to install next to
       # the App Store build, since a sideloaded app cannot replace it in place.
@@ -178,8 +179,9 @@ jobs:
           schemes=$(jq -r '.workspace.schemes[]' build/xcode-list.json)
           scheme=$(printf '%s\n' "$schemes" | grep -x -m1 -- "$project" || true)
           if [ -z "$scheme" ]; then
-            # sed, unlike head, reads to EOF, so pipefail cannot see SIGPIPE.
-            scheme=$(printf '%s\n' "$schemes" | sed -n '1p')
+            # Never start from a CocoaPods aggregate scheme: it would build the
+            # pods and none of the app.
+            scheme=$(printf '%s\n' "$schemes" | grep -v -m1 '^Pods-' || true)
           fi
           test -n "$scheme"
           echo "workspace=$workspace scheme=$scheme"

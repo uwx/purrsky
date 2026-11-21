@@ -1,6 +1,11 @@
 import {TID} from '@atproto/common-web'
 import {type Client} from '@atproto/lex'
-import {AtUri, type NsidString, type UriString} from '@atproto/syntax'
+import {
+  AtUri,
+  type NsidString,
+  toDatetimeString,
+  type UriString,
+} from '@atproto/syntax'
 import {useLingui} from '@lingui/react/macro'
 import {useMutation, useQueryClient} from '@tanstack/react-query'
 
@@ -91,7 +96,7 @@ export function useSavePackMutation() {
         // else would either fail the lexicon or render as a dead link.
         source: getSafeSourceUrl(draft.source) as UriString | undefined,
         license: draft.license?.trim() || undefined,
-        createdAt: previous?.createdAt ?? new Date().toISOString(),
+        createdAt: previous?.createdAt ?? toDatetimeString(new Date()),
         labels: previous?.labels,
       }
       const rkey = editing ? packRkey(editing.uri) : TID.nextStr()

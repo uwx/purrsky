@@ -1,0 +1,239 @@
+name: Build iOS
+
+# Unsigned device build. There are no Apple Developer credentials in CI (see
+# `appleTeamId` in app.config.js), so code signing is switched off and the
+# .ipa is left for a sideloading tool to re-sign with the installer's own
+# certificate and provisioning profile: Sideloadly, AltStore/SideStore, or
+# TrollStore. It installs as-is only on a jailbroken device.
+#
+# Because the runner has no signing identity, entitlements are not applied
+# either: app groups, push notifications and the App Clip. Those come back
+# when the IPA is re-signed, if the signing certificate supports them.
+#
+# Produces an .ipa artifact on every run; publishes a GitHub release on main.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+concurrency:
+  group: build-ios-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    # macos-latest is macOS 26 arm64: Xcode 26.6 (iOS 26.5 SDK), CocoaPods
+    # 1.17 and Ruby 3.4 preinstalled. React Native is compiled from source
+    # (expo-build-properties buildReactNativeFromSource), which is the bulk of
+    # the runtime, so the job is capped at GitHub's 6 hour maximum.
+    runs-on: macos-latest
+    timeout-minutes: 360
+    permissions:
+      # softprops/action-gh-release creates the tag and release
+      contents: write
+    env:
+      # EXPO_PUBLIC_* values are inlined into the bundle at build time, so they
+      # have to be set here. A value set anywhere later is too late.
+      EXPO_PUBLIC_ENV: production
+      EXPO_PUBLIC_OAUTH_BASE_URL: ${{ vars.OAUTH_BASE_URL || 'https://witchsky.app' }}
+      EXPO_PUBLIC_OAUTH_NATIVE_BASE_URL: ${{ vars.OAUTH_NATIVE_BASE_URL || 'https://app.puppykitty.racing' }}
+      EXPO_PUBLIC_APP_NAME: ${{ vars.APP_NAME || 'Purrsky' }}
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      EXPO_PUBLIC_BUNDLE_IDENTIFIER: ${{ github.sha }}
+      # app.config.js also reads this for the icon choice: only `ios` gets the
+      # .icon (Icon Composer) asset, and only `ios` gets the .aiff notification
+      # sound. Must be set before prebuild, which consumes the config.
+      EAS_BUILD_PLATFORM: ios
+      # Without a Team ID the generated project keeps app.config.js's
+      # placeholder. Signing is disabled below, so it is never validated.
+      BSKY_IOS_BUILD_NUMBER: ${{ github.run_number }}
+      # Lets a dispatch override the bundle identifier, e.g. to install next to
+      # the App Store build, since a sideloaded app cannot replace it in place.
+      WITCHSKY_BUNDLE_ID: ${{ vars.WITCHSKY_BUNDLE_ID || 'app.witchsky' }}
+      # Production is what makes app.config.js turn OTA updates on, and the
+      # update channel is Bluesky's (updates.bsky.app), not ours. Left on, the
+      # IPA would poll for a bundle matching this runtime version and could pull
+      # one that was never built from this source.
+      DISABLE_UPDATES: "1"
+      # There is no Sentry auth token here, and the upload task fails without
+      # one. See the sideload-android EAS profile and the local build script.
+      SENTRY_DISABLE_AUTO_UPLOAD: "true"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v7
+
+      # package.json requires node >=24.22.1 and devEngines pins pnpm 11.28.5.
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.28.5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+
+      # The image ships six Xcode versions plus iOS/tvOS/watchOS/visionOS
+      # simulator runtimes, an Android SDK and several language toolchains -
+      # tens of gigabytes this job never reads. A from-source React Native
+      # build does not fit on the default volume without reclaiming them.
+      # The active Xcode is resolved through its symlinks so it can never be
+      # selected for deletion.
+      - name: Free disk space
+        run: |
+          df -h /
+          active_app="$(xcode-select -p)"; active_app="${active_app%/Contents/Developer}"
+          active_real="$(cd "$active_app" && pwd -P)"
+          echo "Keeping $active_real"
+          for xc in /Applications/Xcode*.app; do
+            if [ "$(cd "$xc" && pwd -P)" = "$active_real" ]; then continue; fi
+            echo "Removing $xc"
+            sudo rm -rf "$xc"
+          done
+          sudo rm -rf /Library/Developer/CoreSimulator
+          rm -rf "$HOME/Library/Developer/CoreSimulator"
+          sudo rm -rf "$HOME/Library/Android" /usr/local/share/dotnet
+          rm -rf "$HOME/.rustup" "$HOME/.dotnet" "$HOME/Library/Caches/Homebrew"
+          df -h /
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Relative to the run, so the ordering matches .env.example's YYMMDDHH.
+      - name: Write build metadata
+        run: |
+          version=$(node --print "require('./package.json').version")
+          bundle_date=$(date -u +%y%m%d%H)
+          echo "EXPO_PUBLIC_RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_BUNDLE_DATE=$bundle_date" >> "$GITHUB_ENV"
+
+      # app.config.js points android.googleServicesFile at this path and it is
+      # gitignored, so the checked-in example stands in for a real project.
+      # Only iOS is prebuilt, but the config is evaluated for both platforms.
+      - name: Copy example build settings
+        run: cp google-services.json.example google-services.json
+
+      # Same as `just intl:build`: the fork has no nightly catalog job, so the
+      # committed .po files drift and a build would otherwise ship message IDs.
+      - name: Build translations
+        run: pnpm intl:build
+
+      # ios/ is gitignored, so the native project is generated from
+      # app.config.js on every run. The CocoaPods step is run separately below
+      # so a pods failure is not reported as a prebuild failure.
+      - name: Prebuild native project
+        run: pnpm exec expo prebuild -p ios --no-install
+        env:
+          EXPO_NO_GIT_STATUS: "1"
+          CI: "1"
+
+      # The checked-in Gemfile pins Ruby 2.7.6 via .ruby-version, which this
+      # runner does not have, so bundler is skipped and the image's own
+      # CocoaPods (Homebrew, vendored Ruby) runs the Podfile directly.
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: pod install
+
+      # `pod install` writes .xcode.env.local with the absolute path of the node
+      # it found, and Xcode's script phases source it. It is the only thing
+      # that hands node to Metro's bundle phase, since those phases do not get
+      # the runner's PATH; without it the build would silently ship a .app
+      # with no JS bundle.
+      - name: Check node path for Xcode
+        run: |
+          cat ios/.xcode.env.local
+          . ios/.xcode.env.local
+          test -x "$NODE_BINARY"
+          "$NODE_BINARY" --version
+
+      # Release configuration builds the JS bundle with Metro and Hermes in the
+      # "Bundle React Native code and images" phase, sourcing the
+      # .xcode.env.local checked above. Signing is disabled for every target,
+      # including the share, notification service and App Clip targets the
+      # config plugins add.
+      - name: Build
+        id: xcode
+        run: |
+          # Actions runs this shell with -e -o pipefail, so avoid pipelines that
+          # can end early (head/grep -q) where the SIGPIPE would fail the step.
+          mkdir -p build
+          set -- ios/*.xcworkspace
+          workspace=$1
+          test -e "$workspace"
+          set -- ios/*.xcodeproj
+          project=$(basename "$1" .xcodeproj)
+          # The scheme the config plugins generate is named after the project;
+          # fall back to whatever the workspace lists first. xcodebuild prints a
+          # "Build settings from command line" preamble before the JSON, so only
+          # the object from the first `{` on is fed to jq.
+          xcodebuild -list -json -workspace "$workspace" > build/xcode-list.raw.json
+          sed -n '/^{/,$p' build/xcode-list.raw.json > build/xcode-list.json
+          schemes=$(jq -r '.workspace.schemes[]' build/xcode-list.json)
+          scheme=$(printf '%s\n' "$schemes" | grep -x -m1 -- "$project" || true)
+          if [ -z "$scheme" ]; then
+            # sed, unlike head, reads to EOF, so pipefail cannot see SIGPIPE.
+            scheme=$(printf '%s\n' "$schemes" | sed -n '1p')
+          fi
+          test -n "$scheme"
+          echo "workspace=$workspace scheme=$scheme"
+          echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      # An unsigned .app is packed exactly like a signed one: Payload/<name>.app
+      # inside a zip renamed to .ipa. ditto preserves symlinks and extended
+      # attributes inside frameworks, where cp -R can lose them.
+      - name: Package IPA
+        run: |
+          products="ios/build/Build/Products/Release-iphoneos"
+          app="$products/${{ steps.xcode.outputs.scheme }}.app"
+          if [ ! -d "$app" ]; then
+            # The scheme is named after the Xcode project, whose product should
+            # match; if it ever does not, the main app is the biggest bundle
+            # because everything else is embedded inside it.
+            app=$(du -sk "$products"/*.app \
+              | awk '$1 > max {max = $1; path = $2} END {print path}')
+          fi
+          test -d "$app"
+          mkdir -p build/Payload
+          ditto "$app" "build/Payload/$(basename "$app")"
+          ipa="build/witchsky-ios-v${{ github.run_number }}.ipa"
+          (cd build && zip -qry -X "$(basename "$ipa")" Payload)
+          # The bundle lives at the app root; its absence means the Metro phase
+          # was skipped and the build is not installable.
+          unzip -l "$ipa" > build/ipa-contents.txt
+          grep 'Payload/[^/]*\.app/main\.jsbundle' build/ipa-contents.txt
+          ls -lh "$ipa"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ios
+          if-no-files-found: error
+          path: build/witchsky-ios-v${{ github.run_number }}.ipa
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        if: github.ref_name == 'main'
+        with:
+          name: Witchsky iOS v${{ github.run_number }}
+          # Distinct from the Android tag (witchsky-vN): the two workflows
+          # keep independent run counters and would eventually collide.
+          tag_name: witchsky-ios-v${{ github.run_number }}
+          files: build/witchsky-ios-v${{ github.run_number }}.ipa

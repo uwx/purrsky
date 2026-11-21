@@ -74,7 +74,6 @@ export const router = new Router<AllNavigatableRoutes>({
   RunesExtraSettings: '/settings/runes/extra',
   RunesExtraFeatureGatesSettings: '/settings/runes/extra/feature-gates',
   RunesSettingsSyncSettings: '/settings/runes/settings-sync',
-  DecorationsSettings: '/settings/decorations',
   AppearanceSettings: '/settings/appearance',
   AppearanceColorThemeSettings: '/settings/appearance/color-theme',
   ThemeGallery: '/settings/appearance/themes/:mode',

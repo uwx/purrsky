@@ -74,7 +74,6 @@ export type CommonNavigatorParams = {
   PreferencesExternalEmbeds: undefined
   AccessibilitySettings: undefined
   AltTextAiSettings: undefined
-  DecorationsSettings: undefined
   AppearanceSettings: undefined
   AppearanceColorThemeSettings: undefined
   ThemeGallery: {mode: 'light' | 'dark' | 'system'}

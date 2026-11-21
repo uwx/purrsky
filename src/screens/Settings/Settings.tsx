@@ -44,6 +44,7 @@ import {useLoggedOutViewControls} from '#/state/shell/logged-out'
 import {useCloseAllActiveElements} from '#/state/util'
 import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {AppServerHeaderControl} from '#/screens/Login/components/AppServerDialog'
+import {EditProfileDialog} from '#/screens/Profile/Header/EditProfileDialog'
 import {GrowthbookDialog} from '#/screens/Settings/components/GrowthbookDialog'
 import * as SettingsList from '#/screens/Settings/components/SettingsList'
 import {atoms as a, platform, tokens, useBreakpoints, useTheme} from '#/alf'
@@ -129,6 +130,7 @@ export function SettingsScreen({}: Props) {
   const {activeTheme} = useThemePrefs()
   const themeUpdate = useActiveThemeUpdate(activeTheme)
   const switchAccountControl = useDialogControl()
+  const editProfileControl = useDialogControl()
   const signOutPromptControl = Prompt.usePromptControl()
   const {data: profile} = useProfileQuery({did: currentAccount?.did})
   const {data: otherProfiles} = useProfilesQuery({
@@ -512,14 +514,16 @@ export function SettingsScreen({}: Props) {
               />
             )}
           </SettingsList.LinkItem>
-          <SettingsList.LinkItem
-            to="/settings/decorations"
-            label={l`Profile decorations`}>
+          <SettingsList.PressableItem
+            label={l`Profile decorations`}
+            accessibilityHint={l`Opens your profile editor`}
+            disabled={!profile}
+            onPress={() => editProfileControl.open()}>
             <SettingsList.ItemIcon icon={SparkleIcon} />
             <SettingsList.ItemText>
               <Trans>Profile decorations</Trans>
             </SettingsList.ItemText>
-          </SettingsList.LinkItem>
+          </SettingsList.PressableItem>
           <SettingsList.LinkItem
             to="/settings/accessibility"
             label={l`Accessibility`}>
@@ -590,6 +594,13 @@ export function SettingsScreen({}: Props) {
       />
 
       <SwitchAccountDialog control={switchAccountControl} />
+      {/*
+       * The decorations row opens the same editor the profile header does, so
+       * there is one place to change decorations instead of a second screen.
+       */}
+      {profile && (
+        <EditProfileDialog profile={profile} control={editProfileControl} />
+      )}
     </Layout.Screen>
   )
 }

@@ -1,22 +1,15 @@
-import {createElement} from 'react'
+import {useState} from 'react'
 import {setupI18n} from '@lingui/core'
 import {I18nProvider} from '@lingui/react'
 import {fireEvent, render} from '@testing-library/react-native'
 
-import {DecorationsSettingsScreen} from './DecorationsSettings'
+import {Text} from '#/components/Typography'
+import {applyDraftEdit, draftFromSaved, draftToPatch} from '../draft'
+import {type DecorationSettings} from '../records'
+import {DecorationsEditor} from './DecorationsEditor'
 
 const i18n = setupI18n({locale: 'en', messages: {en: {}}})
-const mockMutate = jest.fn<
-  void,
-  [Record<string, unknown>, {onSuccess?: (result: {next: unknown}) => void}?]
->()
-const mockSettings = {
-  data: {} as Record<string, unknown>,
-  isLoading: false,
-  isSuccess: true,
-  isError: false,
-  refetch: jest.fn(),
-}
+const mockSave = jest.fn<void, [DecorationSettings]>()
 
 jest.mock('@lingui/react/macro', () => {
   const actual = jest.requireActual('@lingui/react/macro')
@@ -38,84 +31,6 @@ jest.mock('@lingui/react/macro', () => {
     }),
   }
 })
-jest.mock('#/state/queries/useCurrentAccountProfile', () => ({
-  useCurrentAccountProfile: () => ({
-    did: 'did:plc:test',
-    handle: 'test.bsky.social',
-    displayName: 'Test Person',
-    avatar: 'https://example.com/a.jpg',
-  }),
-}))
-jest.mock('#/features/avatarDecorations', () => {
-  const shapes: Record<string, unknown> = jest.requireActual(
-    '#/features/avatarDecorations/avatarShapes',
-  )
-  const catalog: Record<string, unknown> = jest.requireActual(
-    '#/features/avatarDecorations/catalog',
-  )
-  const draft: Record<string, unknown> = jest.requireActual(
-    '#/features/avatarDecorations/draft',
-  )
-  const gradients: Record<string, unknown> = jest.requireActual(
-    '#/features/avatarDecorations/nameGradients',
-  )
-  const oklch: Record<string, unknown> = jest.requireActual(
-    '#/features/avatarDecorations/oklch',
-  )
-  const paint: Record<string, unknown> = jest.requireActual(
-    '#/features/avatarDecorations/namePaint',
-  )
-  const googleFonts: Record<string, unknown> = jest.requireActual(
-    '#/features/avatarDecorations/googleFonts',
-  )
-  return {
-    ...shapes,
-    ...catalog,
-    ...draft,
-    ...gradients,
-    ...oklch,
-    ...paint,
-    ...googleFonts,
-    DecorationsEditor: (
-      jest.requireActual<{
-        DecorationsEditor: React.ComponentType
-      }>('#/features/avatarDecorations/editor/DecorationsEditor')
-    ).DecorationsEditor,
-    nameGradientTextStyle: () => ({}),
-    useNameFontAlias: () => undefined,
-    useNameFontPreviewAlias: () => undefined,
-    useAnimatedAvatarBlob: () => undefined,
-    useMyDecorationSettingsQuery: () => mockSettings,
-    useSaveDecorations: () => ({
-      mutate: (
-        vars: {draft: unknown; saved: Record<string, unknown>},
-        options?: {onSuccess?: (result: {next: unknown}) => void},
-      ) => {
-        const toPatch = draft.draftToPatch as (...args: unknown[]) => Record<
-          string,
-          unknown
-        >
-        mockMutate(toPatch(vars.draft, vars.saved), options)
-      },
-      isPending: false,
-    }),
-  }
-})
-/*
- * The editor imports its hooks from sibling modules rather than the feature
- * barrel, so the barrel mock above does not reach them.
- */
-jest.mock('#/features/avatarDecorations/useDecorations', () => ({
-  useAnimatedAvatarBlob: () => undefined,
-  useAnimatedAvatar: () => undefined,
-}))
-jest.mock('#/features/avatarDecorations/nameFonts', () => ({
-  useNameFontAlias: () => undefined,
-  useNameFontPreviewAlias: () => undefined,
-}))
-jest.mock('#/lib/haptics', () => ({
-  useHaptics: () => ({selection: jest.fn(), tap: jest.fn()}),
-}))
 jest.mock('#/components/Dialog', () => {
   const react: typeof import('react') = jest.requireActual('react')
   const rn: typeof import('react-native') = jest.requireActual('react-native')
@@ -160,39 +75,6 @@ jest.mock('#/view/com/util/UserAvatar', () => {
       }),
   }
 })
-jest.mock('#/components/Layout', () => {
-  const react: typeof import('react') = jest.requireActual('react')
-  const rn: typeof import('react-native') = jest.requireActual('react-native')
-  const {createElement: h} = react
-  const {View} = rn
-  const Pass = ({children}: {children?: React.ReactNode}) =>
-    h(View, null, children)
-  return {
-    Screen: Pass,
-    Content: Pass,
-    Header: {
-      Outer: Pass,
-      BackButton: () => null,
-      Content: Pass,
-      TitleText: Pass,
-      Slot: () => null,
-    },
-  }
-})
-jest.mock('#/screens/Settings/components/SettingsList', () => {
-  const react: typeof import('react') = jest.requireActual('react')
-  const rn: typeof import('react-native') = jest.requireActual('react-native')
-  const {createElement: h} = react
-  const {View} = rn
-  const Pass = ({children}: {children?: React.ReactNode}) =>
-    h(View, null, children)
-  return {
-    Container: Pass,
-    Group: Pass,
-    Divider: () => null,
-    ItemText: Pass,
-  }
-})
 jest.mock('#/components/Button', () => {
   const react: typeof import('react') = jest.requireActual('react')
   const rn: typeof import('react-native') = jest.requireActual('react-native')
@@ -234,14 +116,14 @@ jest.mock('#/platform/ui-text-view', () => {
   return {UITextView: rn.Text}
 })
 jest.mock('#/components/Typography', () => {
+  const react: typeof import('react') = jest.requireActual('react')
   const rn: typeof import('react-native') = jest.requireActual('react-native')
-  return {Text: rn.Text}
+  return {
+    Text: ({children, ...rest}: {children?: React.ReactNode}) =>
+      react.createElement(rn.Text, rest, children),
+  }
 })
-jest.mock('#/components/Loader', () => ({Loader: () => null}))
 jest.mock('#/components/Toast', () => ({show: jest.fn()}))
-jest.mock('#/components/Admonition', () => ({
-  Admonition: ({children}: {children: React.ReactNode}) => children,
-}))
 jest.mock('#/components/Pressable', () => {
   const rn: typeof import('react-native') = jest.requireActual('react-native')
   return {Pressable: rn.Pressable}
@@ -288,47 +170,81 @@ jest.mock('expo-linear-gradient', () => {
     LinearGradient: (props: Record<string, unknown>) => h(View, props),
   }
 })
+/*
+ * The editor imports its hooks from sibling modules rather than the feature
+ * barrel, so mocking the barrel would not reach them.
+ */
+jest.mock('../useDecorations', () => ({
+  useAnimatedAvatarBlob: () => undefined,
+  useAnimatedAvatar: () => undefined,
+}))
+jest.mock('../nameFonts', () => ({
+  useNameFontAlias: () => undefined,
+  useNameFontPreviewAlias: () => undefined,
+}))
+jest.mock('#/lib/haptics', () => ({
+  useHaptics: () => ({selection: jest.fn(), tap: jest.fn()}),
+}))
 
-function renderScreen() {
+/**
+ * Stand-in for the host that owns the draft (the edit-profile dialog): it
+ * applies each edit and exposes a Save that resolves the draft to a patch, so
+ * the assertions read the same record the writer would receive.
+ */
+function Harness({saved = {}}: {saved?: DecorationSettings}) {
+  const [draft, setDraft] = useState(() => draftFromSaved(saved))
+  return (
+    <>
+      <DecorationsEditor
+        saved={saved}
+        draft={draft}
+        onEdit={patch =>
+          setDraft(current => applyDraftEdit(current, saved, patch))
+        }
+        avatar="https://example.com/a.jpg"
+        displayName="Test Person"
+        handle="test.bsky.social"
+      />
+      <Text
+        testID="saveDecorations"
+        onPress={() => mockSave(draftToPatch(draft, saved))}>
+        Save
+      </Text>
+    </>
+  )
+}
+
+function renderEditor(saved: DecorationSettings = {}) {
   return render(
-    createElement(
-      I18nProvider,
-      {i18n},
-      createElement(DecorationsSettingsScreen, {
-        navigation: {} as never,
-        route: {} as never,
-      }),
-    ),
+    <I18nProvider i18n={i18n}>
+      <Harness saved={saved} />
+    </I18nProvider>,
   )
 }
 
 beforeEach(() => {
-  mockMutate.mockReset()
-  mockSettings.data = {}
+  mockSave.mockReset()
 })
 
 it('saves the picked frame, shape, gradient, and outline together', () => {
-  const {getByLabelText} = renderScreen()
+  const {getByTestId, getByLabelText} = renderEditor()
 
   fireEvent.press(getByLabelText('Flame'))
   fireEvent.press(getByLabelText('Hexagon'))
   fireEvent.press(getByLabelText('Sunset'))
-  fireEvent.press(getByLabelText('Save'))
+  fireEvent.press(getByTestId('saveDecorations'))
 
-  expect(mockMutate).toHaveBeenCalledTimes(1)
-  expect(mockMutate).toHaveBeenCalledWith(
-    {
-      avatar: 'flame-ring',
-      avatarShape: 'hexagon',
-      name: 'sunset',
-      nameOutline: false,
-    },
-    expect.anything(),
-  )
+  expect(mockSave).toHaveBeenCalledTimes(1)
+  expect(mockSave).toHaveBeenCalledWith({
+    avatar: 'flame-ring',
+    avatarShape: 'hexagon',
+    name: 'sunset',
+    nameOutline: false,
+  })
 })
 
 it('previews pending choices before they are saved', () => {
-  const {getByTestId} = renderScreen()
+  const {getByTestId} = renderEditor()
 
   fireEvent.press(getByTestId('decoration-frame-ocean-ring'))
   fireEvent.press(getByTestId('avatar-shape-squircle'))
@@ -340,82 +256,84 @@ it('previews pending choices before they are saved', () => {
 })
 
 it('starts from the saved record and saves nothing until it changes', () => {
-  mockSettings.data = {
+  const {getByTestId} = renderEditor({
     avatar: 'gold-ring',
     avatarShape: 'circle',
     name: 'rose',
     nameOutline: true,
-  }
-  const {getByTestId, getByLabelText} = renderScreen()
+  })
 
   expect(getByTestId('previewAvatar')).toHaveProp(
     'accessibilityLabel',
     'circle gold-ring',
   )
-  fireEvent.press(getByLabelText('Save'))
-  expect(mockMutate).not.toHaveBeenCalled()
+  fireEvent.press(getByTestId('saveDecorations'))
+  expect(mockSave).toHaveBeenCalledTimes(1)
+  // An untouched draft round-trips to the record it came from.
+  expect(mockSave).toHaveBeenCalledWith({
+    avatar: 'gold-ring',
+    avatarShape: 'circle',
+    name: 'rose',
+    nameOutline: true,
+  })
 })
 
 it('clears a slot by choosing None', () => {
-  mockSettings.data = {avatar: 'gold-ring', name: 'rose'}
-  const {getByLabelText, getByTestId} = renderScreen()
+  const {getByTestId} = renderEditor({
+    avatar: 'gold-ring',
+    name: 'rose',
+  })
 
   fireEvent.press(getByTestId('decoration-frame-none'))
   fireEvent.press(getByTestId('decoration-gradient-none'))
-  fireEvent.press(getByLabelText('Save'))
+  fireEvent.press(getByTestId('saveDecorations'))
 
-  expect(mockMutate).toHaveBeenCalledWith(
-    {
-      avatar: undefined,
-      name: undefined,
-      avatarShape: undefined,
-      nameOutline: false,
-    },
-    expect.anything(),
-  )
+  expect(mockSave).toHaveBeenCalledWith({
+    avatar: undefined,
+    name: undefined,
+    avatarShape: undefined,
+    nameOutline: false,
+  })
 })
 
 it('stores an arbitrary frame color without a preset frame', () => {
-  const {getByTestId, getByLabelText} = renderScreen()
+  const {getByTestId} = renderEditor()
 
   fireEvent.press(getByTestId('decoration-frame-custom'))
   fireEvent.changeText(getByTestId('decoration-frame-color-hex'), '#123456')
-  fireEvent.press(getByLabelText('Save'))
+  fireEvent.press(getByTestId('saveDecorations'))
 
-  expect(mockMutate).toHaveBeenCalledWith(
+  expect(mockSave).toHaveBeenCalledWith(
     expect.objectContaining({avatar: undefined, avatarColor: '#123456'}),
-    expect.anything(),
   )
 })
 
 it('stores an arbitrary solid name color and drops the preset', () => {
-  mockSettings.data = {name: 'rose'}
-  const {getByTestId, getByLabelText} = renderScreen()
+  const {getByTestId} = renderEditor({name: 'rose'})
 
   fireEvent.press(getByTestId('decoration-gradient-custom'))
   fireEvent.changeText(getByTestId('decoration-name-color-hex'), '#00ff88')
-  fireEvent.press(getByLabelText('Save'))
+  fireEvent.press(getByTestId('saveDecorations'))
 
-  expect(mockMutate).toHaveBeenCalledWith(
+  expect(mockSave).toHaveBeenCalledWith(
     expect.objectContaining({
       name: undefined,
       nameColor: '#00ff88',
       nameGradient: undefined,
     }),
-    expect.anything(),
   )
 })
 
 it('stores a custom 3-stop gradient and never keeps a second paint', () => {
-  const {getByTestId, getByLabelText} = renderScreen()
+  const {getByTestId, getByLabelText} = renderEditor()
 
   fireEvent.press(getByTestId('decoration-gradient-custom'))
   fireEvent.press(getByLabelText('Gradient'))
   fireEvent.press(getByLabelText('Three colors'))
   fireEvent.press(getByLabelText('Hard edges'))
-  fireEvent.press(getByLabelText('Save'))
+  fireEvent.press(getByTestId('saveDecorations'))
 
-  const [patch] = mockMutate.mock.calls[0]
+  const [patch] = mockSave.mock.calls[0]
   expect(patch.nameColor).toBeUndefined()
   expect(patch.name).toBeUndefined()
   expect(patch.nameGradient).toEqual({

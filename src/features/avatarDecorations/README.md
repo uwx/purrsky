@@ -114,11 +114,13 @@ Two viewer-side display options (`state/preferences`) sit on top of the record:
 The editor lives in the feature (`editor/DecorationsEditor.tsx`) and is rendered
 inline in the edit-profile dialog (`screens/Profile/Header/EditProfileDialog.tsx`),
 so decorations save with the rest of the profile. It owns no record state: the
-dialog keeps the draft and writes it before the profile record. Settings ->
-Profile decorations (`screens/Settings/DecorationsSettings.tsx`) hosts the same
-editor for the standalone route. The draft state machine lives in `draft.ts` so
-the "untouched slots follow the saved record, touched slots win" rule is testable
-on its own.
+dialog keeps the draft and writes it before the profile record. There is no
+separate decorations screen: Settings -> Profile decorations opens that same
+dialog over the Settings screen (`screens/Settings/Settings.tsx`), so the editor
+has one host. The draft state machine lives in `draft.ts` so the "untouched
+slots follow the saved record, touched slots win" rule is testable on its own;
+the editor's own test (`editor/DecorationsEditor.test.tsx`) drives the controls
+against a host that keeps the draft, the way the dialog does.
 
 An animated pick is uploaded on save (`useSaveDecorations`) before the record is
 written, because a record can only name bytes that already exist. The upload is

@@ -1,10 +1,11 @@
 name: Build iOS
 
-# Unsigned device build. There are no Apple Developer credentials in CI (see
-# `appleTeamId` in app.config.js), so code signing is switched off and the
-# .ipa is left for a sideloading tool to re-sign with the installer's own
-# certificate and provisioning profile: Sideloadly, AltStore/SideStore, or
-# TrollStore. It installs as-is only on a jailbroken device.
+# Unsigned device build. There are no Apple Developer credentials in CI
+# (app.config.js only sets appleTeamId when WITCHSKY_APPLE_TEAM_ID is given),
+# so code signing is switched off and the .ipa is left for a sideloading tool
+# to re-sign with the installer's own certificate and provisioning profile:
+# Sideloadly, AltStore/SideStore, or TrollStore. It installs as-is only on a
+# jailbroken device.
 #
 # Because the runner has no signing identity, entitlements are not applied
 # either: app groups, push notifications and the App Clip. Those come back

@@ -84,6 +84,16 @@ This is NOT required when developing for web.
 
 After you do `pnpm ios` and `pnpm android` once, you can later just run `pnpm web` and then press either `i` or `a` to open iOS and Android emulators respectively which is much faster. However, if you make native changes, you'll have to do `pnpm prebuild -p ios` and `pnpm prebuild -p android` and then `pnpm ios` and `pnpm android` again before you can continue with the same workflow.
 
+### iOS IPA without a Mac
+
+`.github/workflows/build-ios.yml` builds an unsigned device IPA on `macos-latest`: prebuild, `pod install`, then a Release `xcodebuild` with code signing disabled. Every run uploads the IPA as an artifact, and a push to `main` also publishes it as a `witchsky-ios-vN` GitHub release.
+
+There are no Apple credentials in CI, so nothing is signed and no entitlements are applied - not the app groups, push notifications, or the App Clip. Re-sign the IPA with Sideloadly, AltStore/SideStore, or TrollStore before installing; only a jailbroken device takes it as-is. Re-signing with a certificate that supports those capabilities restores them.
+
+Two optional repository variables change the build without a code change: `WITCHSKY_BUNDLE_ID` (default `app.witchsky`) picks the bundle identifier, so a build can sit next to an App Store install, and `WITCHSKY_APPLE_TEAM_ID` sets `DEVELOPMENT_TEAM`.
+
+The job compiles React Native from source (`buildReactNativeFromSource`) on a 3-core runner, so it takes about an hour, and it deletes the unused Xcode installs and simulator runtimes first to make room.
+
 ### Tips
 
 - Copy the `.env.example` to `.env` and fill in any necessary tokens. (The Sentry token is NOT required; see instructions below if you want to enable Sentry.)

@@ -10,7 +10,7 @@ import {
 } from '#/lib/constants'
 import {device} from '#/storage'
 
-export type AppViewPresetId = 'bluesky' | 'blacksky' | 'custom'
+export type AppViewPresetId = 'bluesky' | 'blacksky' | 'eurosky' | 'custom'
 
 export type AppViewPreset = {
   id: AppViewPresetId
@@ -31,8 +31,8 @@ export type AppViewPreset = {
 
 /**
  * Named AppView presets offered on the sign-in screen. Bluesky clears any
- * override so the build defaults apply; Blacksky points at their public
- * AppView DID/URL.
+ * override so the build defaults apply; Blacksky and Eurosky point at their
+ * public AppView DID/URL.
  */
 export const APPVIEW_PRESETS: Record<
   Exclude<AppViewPresetId, 'custom'>,
@@ -49,6 +49,12 @@ export const APPVIEW_PRESETS: Record<
     title: 'Blacksky',
     url: 'https://api.blacksky.community',
     did: 'did:web:api.blacksky.community',
+  },
+  eurosky: {
+    id: 'eurosky',
+    title: 'Eurosky',
+    url: 'https://api.eurosky.network',
+    did: 'did:web:api.eurosky.network',
   },
 }
 
@@ -143,11 +149,14 @@ export function getActiveAppViewPreset(
   }
 
   const normalizedUrl = normalizeAppViewUrl(url)
-  if (
-    did === APPVIEW_PRESETS.blacksky.did ||
-    normalizedUrl === normalizeAppViewUrl(APPVIEW_PRESETS.blacksky.url)
-  ) {
-    return 'blacksky'
+  for (const preset of Object.values(APPVIEW_PRESETS)) {
+    if (preset.id === 'bluesky') continue
+    if (
+      did === preset.did ||
+      (!!normalizedUrl && normalizedUrl === normalizeAppViewUrl(preset.url))
+    ) {
+      return preset.id
+    }
   }
 
   if (
@@ -169,11 +178,8 @@ export function getActiveAppViewTitle(
   url: string | undefined,
 ): string {
   const preset = getActiveAppViewPreset(did, url)
-  if (preset === 'bluesky') {
-    return APPVIEW_PRESETS.bluesky.title
-  }
-  if (preset === 'blacksky') {
-    return APPVIEW_PRESETS.blacksky.title
+  if (preset !== 'custom') {
+    return APPVIEW_PRESETS[preset].title
   }
   if (url) {
     try {

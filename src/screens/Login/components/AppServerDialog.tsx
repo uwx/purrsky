@@ -398,11 +398,9 @@ function AppServerDialogInner({
         if (preset === 'bluesky') {
           return {did: undefined, url: undefined}
         }
-        if (preset === 'blacksky') {
-          return {
-            did: APPVIEW_PRESETS.blacksky.did,
-            url: APPVIEW_PRESETS.blacksky.url,
-          }
+        if (preset !== 'custom') {
+          const {did, url} = APPVIEW_PRESETS[preset]
+          return {did, url}
         }
         if (!customIsValid || !derivedDid) {
           return 'invalid'
@@ -473,6 +471,12 @@ function AppServerDialogInner({
             value="blacksky"
             label={l`Blacksky`}>
             <SegmentedControl.ItemText>{l`Blacksky`}</SegmentedControl.ItemText>
+          </SegmentedControl.Item>
+          <SegmentedControl.Item
+            testID="appServerEuroskyBtn"
+            value="eurosky"
+            label={l`Eurosky`}>
+            <SegmentedControl.ItemText>{l`Eurosky`}</SegmentedControl.ItemText>
           </SegmentedControl.Item>
           <SegmentedControl.Item
             testID="appServerCustomBtn"

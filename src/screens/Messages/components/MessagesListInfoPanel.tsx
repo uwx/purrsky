@@ -66,6 +66,7 @@ export function MessagesListInfoPanel({
         type={profile.associated?.labeler ? 'labeler' : 'user'}
         size={88}
         avatar={profile?.avatar}
+        did={profile.did}
         decoration={decoration}
         profileShape={profileShape}
       />

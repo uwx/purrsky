@@ -14,6 +14,8 @@ import {getDataUriSize} from './util'
 
 export type PickerImage = ImageMeta & {
   size: number
+  /** Name the file was picked under, when the picker reports one. */
+  fileName?: string
 }
 
 export async function openPicker(opts?: ImagePickerOptions) {
@@ -22,11 +24,11 @@ export async function openPicker(opts?: ImagePickerOptions) {
     mediaTypes: ['images'],
     quality: 1,
     selectionLimit: 1,
-    ...opts,
     shouldDownloadFromNetwork: true,
     legacy: true,
     preferredAssetRepresentationMode:
       UIImagePickerPreferredAssetRepresentationMode.Automatic,
+    ...opts,
   })
 
   return (response.assets ?? [])
@@ -42,7 +44,10 @@ export async function openPicker(opts?: ImagePickerOptions) {
       height: image.height,
       width: image.width,
       path: image.uri,
-      size: getDataUriSize(image.uri),
+      fileName: image.fileName ?? undefined,
+      // The picker reports the real byte count; estimating from the URI is
+      // only a fallback for assets it could not measure.
+      size: image.fileSize ?? getDataUriSize(image.uri),
     }))
 }
 

@@ -47,6 +47,7 @@ jest.mock('#/features/avatarDecorations', () => ({
   HexagonAvatar: () => null,
   useAvatarDecoration: () => undefined,
   useAvatarShape: () => undefined,
+  useAnimatedAvatar: () => undefined,
 }))
 jest.mock('#/features/liveNow', () => ({}))
 jest.mock('#/features/liveNow/components/LiveIndicator', () => ({}))

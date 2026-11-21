@@ -207,6 +207,7 @@ export function Avatar({
     <UserAvatar
       size={size}
       avatar={profile.avatar}
+      did={profile.did}
       type={profile.associated?.labeler ? 'labeler' : 'user'}
       moderation={moderation.ui('avatar')}
       live={liveOverride ?? live}

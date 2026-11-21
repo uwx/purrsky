@@ -333,6 +333,7 @@ let ProfileHeaderShell = ({
                 type={profile.associated?.labeler ? 'labeler' : 'user'}
                 size={live.isActive ? 88 : 90}
                 avatar={profile.avatar}
+                did={profile.did}
                 moderation={moderation.ui('avatar')}
                 decoration={decoration}
                 profileShape={profileShape}

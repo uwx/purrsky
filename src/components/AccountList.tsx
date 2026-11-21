@@ -210,6 +210,7 @@ function AccountItem({
           ]}>
           <UserAvatar
             avatar={profile?.avatar}
+            did={profile?.did}
             size={useCompactSwitcher ? 36 : 48}
             type={profile?.associated?.labeler ? 'labeler' : 'user'}
             live={live}

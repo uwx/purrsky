@@ -1,20 +1,38 @@
 import {type TextStyle} from 'react-native'
-import {type Client} from '@atproto/lex'
+import {type BlobRef, type Client} from '@atproto/lex'
 import {type DidString} from '@atproto/syntax'
 import {useMutation, useQuery, useQueryClient} from '@tanstack/react-query'
 
+import {uploadBlob} from '#/lib/api'
 import {useDeferredEnable} from '#/lib/hooks/useDeferredEnable'
+import {type ImgproxyPreset} from '#/lib/media/util'
 import {isRecordNotFoundError} from '#/lib/xrpc-error'
+import {useA11y} from '#/state/a11y'
 import {
   useDisableCustomNameStyles,
   useShowNameOutlines,
 } from '#/state/preferences'
+import {
+  maybeModifyImageCdnHost,
+  useImageCdnHost,
+} from '#/state/preferences/image-cdn-host'
 import {useSlingshotInstance} from '#/state/preferences/slingshot-instance'
 import {STALE} from '#/state/queries'
+import {resolvePdsServiceUrl} from '#/state/queries/resolve-identity'
 import {createQueryKey} from '#/state/queries/util'
-import {usePdsClient, useSession} from '#/state/session'
+import {usePdsClient, usePdsServiceUrl, useSession} from '#/state/session'
 import {com} from '#/lexicons'
+import {
+  animatedAvatarPlayUrl,
+  avatarBlobCid,
+  avatarBlobStillUrl,
+} from './animatedAvatar'
 import {type DecorationFrame, resolveFrame} from './catalog'
+import {
+  type DecorationDraft,
+  draftToPatch,
+  resolveDraft,
+} from './draft'
 import {useNameFontAlias} from './nameFonts'
 import {type NameGradientSpec} from './nameGradients'
 import {nameGradientTextStyle} from './nameGradientStyle'
@@ -74,6 +92,88 @@ export function useAvatarDecoration(
 /** Active avatar shape for a DID, or undefined when the viewer default applies. */
 export function useAvatarShape(did: string | undefined) {
   return useActiveDecorations(did)?.avatarShape
+}
+
+const avatarPdsQueryRoot = 'avatarPdsService'
+
+/**
+ * The PDS origin for `did`, needed to read blob bytes. Only resolved on demand:
+ * a profile's own PDS is already known, and a viewer who cannot see motion
+ * never needs anyone else's.
+ */
+function useAvatarPdsUrl(did: string | undefined, enabled: boolean) {
+  const {currentAccount} = useSession()
+  const ownPds = usePdsServiceUrl()
+  const isOwn = !!did && did === currentAccount?.did
+  const deferred = useDeferredEnable(!!did && enabled && !isOwn)
+  const {data} = useQuery({
+    queryKey: createQueryKey(avatarPdsQueryRoot, {did}),
+    enabled: deferred,
+    staleTime: STALE.HOURS.ONE,
+    queryFn: () => resolvePdsServiceUrl(did as DidString),
+  })
+  return isOwn ? ownPds : data
+}
+
+/**
+ * An animated avatar a viewer may play, plus a still for when they should not.
+ * `playUri` stays undefined until the owner's PDS is known and is always
+ * undefined when the platform reports reduced motion.
+ */
+export type AnimatedAvatarSource = {
+  /** Original blob bytes; only set when motion is allowed. */
+  playUri?: string
+  /** First frame from the image CDN, safe to render anywhere. */
+  stillUri: string
+  /** The blob the source renders, so a failure stays attached to it. */
+  cid: string
+}
+
+/**
+ * Resolves an animated avatar blob into the URLs a renderer needs. `did` owns
+ * the blob, so its PDS serves the bytes. Motion is off (and no PDS lookup
+ * happens) when the platform reports reduced motion.
+ */
+export function useAnimatedAvatarBlob(
+  did: string | undefined,
+  blob: BlobRef | undefined,
+  preset: ImgproxyPreset = 'avatar',
+  /**
+   * False when this renderer cannot show motion (a hexagon clip, a tiny
+   * avatar), so no PDS lookup is made for bytes that would never play.
+   */
+  playable = true,
+): AnimatedAvatarSource | undefined {
+  const cid = avatarBlobCid(blob)
+  const imageCdnHost = useImageCdnHost()
+  const reduceMotion = useA11y().reduceMotionEnabled
+  const play = playable && !reduceMotion
+  const pdsUrl = useAvatarPdsUrl(did, !!cid && play)
+
+  if (!did || !cid) return undefined
+  return {
+    ...(play ? {playUri: animatedAvatarPlayUrl(pdsUrl, did, cid)} : {}),
+    // The still stays a PNG: converting it to the viewer's thumbnail format
+    // would drop the transparency animated stickers depend on.
+    stillUri: maybeModifyImageCdnHost(
+      avatarBlobStillUrl(did, cid, preset),
+      imageCdnHost,
+    ),
+    cid,
+  }
+}
+
+/**
+ * Resolves the animated avatar `did` stores in their decorations record, or
+ * undefined when they have none.
+ */
+export function useAnimatedAvatar(
+  did: string | undefined,
+  preset: ImgproxyPreset = 'avatar',
+  playable = true,
+): AnimatedAvatarSource | undefined {
+  const active = useActiveDecorations(did)
+  return useAnimatedAvatarBlob(did, active?.avatarAnimated, preset, playable)
 }
 
 /** Active display-name gradient for a DID, or undefined. */
@@ -161,6 +261,34 @@ export function useMyDecorationSettings(): DecorationSettings {
  * is already stored (putRecord replaces the whole record, so this is a
  * read-modify-write). Pass a slot as undefined to clear it.
  */
+/**
+ * Saves a decorations draft. A picked animation is uploaded first, because the
+ * record can only name bytes that already exist; every other slot is written
+ * from the draft as-is.
+ */
+export function useSaveDecorations() {
+  const client = usePdsClient()
+  const setDecorations = useSetDecorations()
+
+  return useMutation({
+    async mutationFn({
+      draft,
+      saved,
+    }: {
+      draft: DecorationDraft
+      saved: DecorationSettings
+    }) {
+      const patch = draftToPatch(draft, saved)
+      const pick = resolveDraft(draft, saved).animatedPick
+      if (pick) {
+        const {blob} = await uploadBlob(client, pick.path, pick.mime)
+        patch.avatarAnimated = blob
+      }
+      return await setDecorations.mutateAsync(patch)
+    },
+  })
+}
+
 export function useSetDecorations() {
   const client = usePdsClient()
   const queryClient = useQueryClient()

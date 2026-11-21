@@ -64,10 +64,12 @@ import {ProfileHoverCard} from '#/components/ProfileHoverCard'
 import {useAnalytics} from '#/analytics'
 import {IS_ANDROID, IS_NATIVE, IS_WEB, IS_WEB_TOUCH_DEVICE} from '#/env'
 import {
+  type AnimatedAvatarSource,
   AvatarDecorationRing,
   type AvatarShape,
   type DecorationFrame,
   HexagonAvatar,
+  useAnimatedAvatar,
   useAvatarDecoration,
   useAvatarShape,
 } from '#/features/avatarDecorations'
@@ -144,11 +146,21 @@ interface BaseUserAvatarProps {
   avatar?: string | null
   live?: boolean
   hideLiveBadge?: boolean
+  /**
+   * Owner of the avatar. Set it for user avatars so an animated profile picture
+   * from their decorations record replaces the static one.
+   */
+  did?: string
 }
 
 interface UserAvatarProps extends BaseUserAvatarProps {
   type: UserAvatarType
   moderation?: ModerationUI
+  /**
+   * Overrides the animated picture resolved from `did`, for previews of a file
+   * that has not been uploaded yet.
+   */
+  animatedAvatar?: AnimatedAvatarSource
   usePlainRNImage?: boolean
   noBorder?: boolean
   onLoad?: () => void
@@ -176,6 +188,12 @@ interface PreviewableUserAvatarProps extends BaseUserAvatarProps {
 }
 
 const BLUR_AMOUNT = IS_WEB ? 5 : 100
+
+/**
+ * Animations need at least a feed-row avatar to read as motion. Below that the
+ * still is indistinguishable and the bytes are not worth fetching per row.
+ */
+const MIN_ANIMATED_AVATAR_SIZE = 32
 
 let DefaultAvatar = ({
   type,
@@ -359,6 +377,8 @@ let UserAvatar = ({
   extraAviStyle,
   decoration,
   profileShape,
+  did,
+  animatedAvatar,
 }: UserAvatarProps): React.ReactNode => {
   const t = useTheme()
 
@@ -377,6 +397,29 @@ let UserAvatar = ({
   })
   const thumbnailFormat = useThumbnailFormat()
   const imageCdnHost = useImageCdnHost()
+  /*
+   * Only ask for playback where it can actually be seen: a hexagon clips
+   * through SVG, a plain RN image decodes one frame, and a blurred avatar never
+   * renders it. Those still get the still frame, without a PDS lookup.
+   */
+  const canPlayAnimation =
+    size >= MIN_ANIMATED_AVATAR_SIZE &&
+    !hexagon &&
+    !usePlainRNImage &&
+    !moderation?.blur
+  const savedAnimated = useAnimatedAvatar(
+    type === 'user' ? did : undefined,
+    size < 90 ? 'avatar_thumbnail' : 'avatar',
+    canPlayAnimation,
+  )
+  const animated = animatedAvatar ?? savedAnimated
+  /*
+   * Blobs this renderer could not load, keyed by CID so a new avatar starts
+   * fresh. The play failure falls back to the still; a still failure falls back
+   * to the profile avatar rather than leaving an empty avatar.
+   */
+  const [failedPlayCid, setFailedPlayCid] = useState<string>()
+  const [failedStillCid, setFailedStillCid] = useState<string>()
 
   const aviStyle = useMemo(() => {
     return {
@@ -452,12 +495,27 @@ let UserAvatar = ({
   }, [size, style, finalShape])
 
   const frame = type === 'user' && !moderation?.blur ? decoration : undefined
-  const imageUri = avatar
+  /*
+   * The animated blob wins over the profile avatar, which holds its first
+   * frame. The still is what a blurred, hexagon, tiny, or reduced-motion
+   * viewer gets, and what a failed playback falls back to.
+   */
+  const playAnimated =
+    canPlayAnimation &&
+    !!animated?.playUri &&
+    failedPlayCid !== animated.cid
+  const stillAnimated = !!animated && failedStillCid !== animated.cid
+  const staticAvatarUri = avatar
     ? applyImageTransforms(hackModifyThumbnailPath(avatar, size < 90), {
         imageCdnHost,
         format: thumbnailFormat,
       })
     : undefined
+  const imageUri = playAnimated
+    ? animated?.playUri
+    : stillAnimated
+      ? animated?.stillUri
+      : staticAvatarUri
 
   const decorationRing = frame && (
     <AvatarDecorationRing
@@ -491,7 +549,7 @@ let UserAvatar = ({
       />
     ) : undefined
 
-  return avatar &&
+  return (avatar || animated) &&
     !(moderation?.blur && IS_ANDROID /* android crashes with blur */) ? (
     <View style={containerStyle}>
       {hexagonImage ??
@@ -512,6 +570,14 @@ let UserAvatar = ({
             contentFit="cover"
             source={{uri: imageUri}}
             blurRadius={moderation?.blur ? BLUR_AMOUNT : 0}
+            autoplay={playAnimated}
+            onError={
+              playAnimated
+                ? () => setFailedPlayCid(animated?.cid)
+                : stillAnimated
+                  ? () => setFailedStillCid(animated?.cid)
+                  : undefined
+            }
             onLoad={onLoad}
             useAppleWebpCodec
           />
@@ -812,6 +878,7 @@ let PreviewableUserAvatar = ({
   const avatarEl = (
     <UserAvatar
       avatar={profile.avatar}
+      did={profile.did}
       moderation={moderation}
       type={profile.associated?.labeler ? 'labeler' : 'user'}
       live={status.isActive || live}

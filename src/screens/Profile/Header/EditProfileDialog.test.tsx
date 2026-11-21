@@ -7,6 +7,10 @@ import {EditProfileDialog} from './EditProfileDialog'
 
 const mockClose = jest.fn<void, [(() => void)?]>()
 const mockNavigate = jest.fn()
+const mockSaveDecorations = jest.fn<
+  Promise<{next: Record<string, unknown>}>,
+  [{draft: Record<string, unknown>; saved: Record<string, unknown>}]
+>()
 
 jest.mock('@lingui/react/macro', () => {
   const actual = jest.requireActual('@lingui/react/macro')
@@ -49,9 +53,15 @@ jest.mock('#/components/Dialog', () => {
     Outer: Pass,
     Handle: () => null,
     Close: () => null,
-    ScrollableInner: Pass,
-    Header: () => null,
-    HeaderText: () => null,
+    ScrollableInner: ({
+      children,
+      header,
+    }: {
+      children?: React.ReactNode
+      header?: React.ReactNode
+    }) => h(rn.View, null, header, children),
+    Header: Pass,
+    HeaderText: Pass,
     Input: ({
       testID,
       onChangeText,
@@ -129,10 +139,40 @@ jest.mock('#/features/profileLinks', () => ({
   useSetOwnProfileLinksCache: () => jest.fn(),
   sameProfileLinks: () => true,
 }))
-jest.mock('#/features/avatarDecorations', () => ({
-  useAvatarShape: () => undefined,
-  useAvatarDecoration: () => undefined,
-}))
+jest.mock('#/features/avatarDecorations', () => {
+  const react: typeof import('react') = jest.requireActual('react')
+  const rn: typeof import('react-native') = jest.requireActual('react-native')
+  const draft = jest.requireActual('#/features/avatarDecorations/draft')
+  return {
+    ...draft,
+    DecorationsEditor: ({
+      onEdit,
+    }: {
+      onEdit: (patch: Record<string, unknown>) => void
+    }) =>
+      react.createElement(
+        rn.Pressable,
+        {
+          testID: 'probeEditDecorations',
+          onPress: () => onEdit({avatar: 'rainbow'}),
+        },
+        react.createElement(rn.View, null),
+      ),
+    useAvatarShape: () => undefined,
+    useAvatarDecoration: () => undefined,
+    useMyDecorationSettingsQuery: () => ({
+      data: {},
+      isLoading: false,
+      isError: false,
+      isSuccess: true,
+      refetch: jest.fn(),
+    }),
+    useSaveDecorations: () => ({
+      mutateAsync: mockSaveDecorations,
+      isPending: false,
+    }),
+  }
+})
 jest.mock('#/view/com/util/UserAvatar', () => {
   const react: typeof import('react') = jest.requireActual('react')
   const rn: typeof import('react-native') = jest.requireActual('react-native')
@@ -182,9 +222,10 @@ afterEach(() => {
   jest.clearAllMocks()
 })
 
-it('renders both settings shortcuts', () => {
+it('edits decorations inline instead of linking to a settings screen', () => {
   const screen = setup()
-  expect(screen.getByTestId('editProfileDecorationsLink')).toBeTruthy()
+  expect(screen.getByTestId('probeEditDecorations')).toBeTruthy()
+  expect(screen.queryByTestId('editProfileDecorationsLink')).toBeNull()
   expect(screen.getByTestId('editProfileAccountSettingsLink')).toBeTruthy()
 })
 
@@ -194,12 +235,12 @@ it('asks before discarding edits, then navigates', () => {
     screen.getByTestId('editProfileDisplayNameInput'),
     'New name',
   )
-  fireEvent.press(screen.getByTestId('editProfileDecorationsLink'))
+  fireEvent.press(screen.getByTestId('editProfileAccountSettingsLink'))
   // Prompt is open; the dialog has not closed yet.
   expect(mockClose).not.toHaveBeenCalled()
   fireEvent.press(screen.getByTestId('probeConfirmDiscard'))
   expect(mockClose).toHaveBeenCalledTimes(1)
-  expect(mockNavigate).toHaveBeenCalledWith('DecorationsSettings')
+  expect(mockNavigate).toHaveBeenCalledWith('AccountSettings')
 })
 
 it('navigates to account settings after the dialog closes', () => {
@@ -208,9 +249,17 @@ it('navigates to account settings after the dialog closes', () => {
   expect(mockNavigate).toHaveBeenCalledWith('AccountSettings')
 })
 
-it('navigates to decorations after the dialog closes', () => {
+it('writes a decoration draft when the profile is saved', () => {
+  mockSaveDecorations.mockResolvedValue({next: {avatar: 'rainbow'}})
   const screen = setup()
-  fireEvent.press(screen.getByTestId('editProfileDecorationsLink'))
-  expect(mockClose).toHaveBeenCalledTimes(1)
-  expect(mockNavigate).toHaveBeenCalledWith('DecorationsSettings')
+  fireEvent.press(screen.getByTestId('probeEditDecorations'))
+  fireEvent.press(screen.getByTestId('editProfileSaveBtn'))
+  expect(mockSaveDecorations).toHaveBeenCalledTimes(1)
+  expect(mockSaveDecorations.mock.calls[0][0]).toEqual({
+    draft: expect.objectContaining({
+      avatar: 'rainbow',
+      touched: true,
+    }),
+    saved: {},
+  })
 })

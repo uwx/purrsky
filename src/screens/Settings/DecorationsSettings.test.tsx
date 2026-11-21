@@ -8,7 +8,7 @@ import {DecorationsSettingsScreen} from './DecorationsSettings'
 const i18n = setupI18n({locale: 'en', messages: {en: {}}})
 const mockMutate = jest.fn<
   void,
-  [Record<string, unknown>, {onSuccess?: () => void}]
+  [Record<string, unknown>, {onSuccess?: (result: {next: unknown}) => void}?]
 >()
 const mockSettings = {
   data: {} as Record<string, unknown>,
@@ -76,13 +76,43 @@ jest.mock('#/features/avatarDecorations', () => {
     ...oklch,
     ...paint,
     ...googleFonts,
+    DecorationsEditor: (
+      jest.requireActual<{
+        DecorationsEditor: React.ComponentType
+      }>('#/features/avatarDecorations/editor/DecorationsEditor')
+    ).DecorationsEditor,
     nameGradientTextStyle: () => ({}),
     useNameFontAlias: () => undefined,
     useNameFontPreviewAlias: () => undefined,
+    useAnimatedAvatarBlob: () => undefined,
     useMyDecorationSettingsQuery: () => mockSettings,
-    useSetDecorations: () => ({mutate: mockMutate, isPending: false}),
+    useSaveDecorations: () => ({
+      mutate: (
+        vars: {draft: unknown; saved: Record<string, unknown>},
+        options?: {onSuccess?: (result: {next: unknown}) => void},
+      ) => {
+        const toPatch = draft.draftToPatch as (...args: unknown[]) => Record<
+          string,
+          unknown
+        >
+        mockMutate(toPatch(vars.draft, vars.saved), options)
+      },
+      isPending: false,
+    }),
   }
 })
+/*
+ * The editor imports its hooks from sibling modules rather than the feature
+ * barrel, so the barrel mock above does not reach them.
+ */
+jest.mock('#/features/avatarDecorations/useDecorations', () => ({
+  useAnimatedAvatarBlob: () => undefined,
+  useAnimatedAvatar: () => undefined,
+}))
+jest.mock('#/features/avatarDecorations/nameFonts', () => ({
+  useNameFontAlias: () => undefined,
+  useNameFontPreviewAlias: () => undefined,
+}))
 jest.mock('#/lib/haptics', () => ({
   useHaptics: () => ({selection: jest.fn(), tap: jest.fn()}),
 }))

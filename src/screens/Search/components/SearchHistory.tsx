@@ -288,6 +288,7 @@ function RecentProfileItem({
         ]}>
         <UserAvatar
           avatar={profile.avatar}
+          did={profile.did}
           type={profile.associated?.labeler ? 'labeler' : 'user'}
           size={width - 8}
           moderation={moderation.ui('avatar')}

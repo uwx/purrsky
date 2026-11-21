@@ -608,6 +608,7 @@ function Inner({
           <UserAvatar
             size={64}
             avatar={profile.avatar}
+            did={profile.did}
             type={isLabeler ? 'labeler' : 'user'}
             moderation={moderation.ui('avatar')}
             decoration={decoration}

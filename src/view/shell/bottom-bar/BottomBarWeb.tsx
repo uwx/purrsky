@@ -286,6 +286,7 @@ export function BottomBarWeb() {
                         ]}>
                         <UserAvatar
                           avatar={profile?.avatar}
+                          did={profile?.did}
                           size={avatarSize}
                           type={isLabeler ? 'labeler' : 'user'}
                           decoration={decoration}

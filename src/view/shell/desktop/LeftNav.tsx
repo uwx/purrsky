@@ -228,6 +228,7 @@ function ProfileCard({minimal}: {minimal: boolean}) {
                     ]}>
                     <UserAvatar
                       avatar={profile.avatar}
+                      did={profile.did}
                       size={LARGE_ELEMENT_SIZE}
                       type={profile?.associated?.labeler ? 'labeler' : 'user'}
                       live={live}

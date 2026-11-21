@@ -1,5 +1,5 @@
 import {msg} from '@lingui/core/macro'
-import {render} from '@testing-library/react-native'
+import {fireEvent, render} from '@testing-library/react-native'
 
 import {UserAvatar} from '#/view/com/util/UserAvatar'
 import {type DecorationFrame} from '#/features/avatarDecorations/catalog'
@@ -64,13 +64,41 @@ jest.mock('#/features/avatarDecorations', () => {
     HexagonAvatar: hexagon.HexagonAvatar,
     useAvatarDecoration: () => undefined,
     useAvatarShape: () => undefined,
+    useAnimatedAvatar: (
+      did: string | undefined,
+      preset: string,
+      playable: boolean,
+    ) => {
+      mockAnimatedCalls.push([did, preset, playable])
+      return mockSavedAnimated
+    },
   }
+})
+jest.mock('expo-image', () => {
+  const react: typeof import('react') = jest.requireActual('react')
+  const rn: typeof import('react-native') = jest.requireActual('react-native')
+  return {Image: (props: Record<string, unknown>) => react.createElement(rn.Image, props)}
 })
 jest.mock('#/features/liveNow', () => ({}))
 jest.mock('#/features/liveNow/components/LiveIndicator', () => ({}))
 jest.mock('#/features/liveNow/components/LiveStatusDialog', () => ({}))
 
 const avatar = 'https://example.com/avatar.jpg'
+const stillUri = 'https://cdn.example.com/still.png'
+const playUri = 'https://pds.example.com/animation.gif'
+
+let mockSavedAnimated: {
+  playUri?: string
+  stillUri: string
+  cid: string
+} | undefined
+
+const mockAnimatedCalls: [string | undefined, string, boolean][] = []
+
+beforeEach(() => {
+  mockSavedAnimated = undefined
+  mockAnimatedCalls.length = 0
+})
 
 it('draws a decoration ring instead of a plain border', () => {
   const {getByTestId, queryByTestId} = render(
@@ -122,4 +150,71 @@ it('never decorates a blurred avatar', () => {
 
   expect(queryByTestId('avatarDecorationRing')).toBeNull()
   expect(queryByTestId('avatarHexagonBorder')).toBeNull()
+})
+
+it('plays a stored animation instead of the profile picture', () => {
+  mockSavedAnimated = {playUri, stillUri, cid: 'bafkreiassed'}
+  const {getByTestId} = render(
+    <UserAvatar type="user" size={48} avatar={avatar} did="did:plc:owner" />,
+  )
+  const image = getByTestId('userAvatarImage')
+  expect(image).toHaveProp('source', {uri: playUri})
+  expect(image).toHaveProp('autoplay', true)
+})
+
+it('shows the still first frame when motion must not play', () => {
+  // useAnimatedAvatar leaves playUri unset when the device reduces motion or
+  // the owner PDS is not known yet; the still is safe either way.
+  mockSavedAnimated = {stillUri, cid: 'bafkreiassed'}
+  const {getByTestId} = render(
+    <UserAvatar type="user" size={48} avatar={avatar} did="did:plc:owner" />,
+  )
+  const image = getByTestId('userAvatarImage')
+  expect(image).toHaveProp('source', {uri: stillUri})
+  expect(image).toHaveProp('autoplay', false)
+})
+
+it('falls back from a broken animation to the still, then the picture', () => {
+  mockSavedAnimated = {playUri, stillUri, cid: 'bafkreiassed'}
+  const {getByTestId} = render(
+    <UserAvatar type="user" size={48} avatar={avatar} did="did:plc:owner" />,
+  )
+  const image = getByTestId('userAvatarImage')
+
+  fireEvent(image, 'error')
+  expect(image).toHaveProp('source', {uri: stillUri})
+
+  fireEvent(image, 'error')
+  expect(image).toHaveProp('source', {uri: avatar})
+})
+
+it('does not look up playback where motion cannot be seen', () => {
+  const cases = [
+    {size: 24, props: {}},
+    {size: 48, props: {profileShape: 'hexagon' as const}},
+    {size: 48, props: {moderation: {blur: true} as never}},
+  ]
+
+  for (const {size, props} of cases) {
+    mockAnimatedCalls.length = 0
+    render(
+      <UserAvatar
+        type="user"
+        size={size}
+        avatar={avatar}
+        did="did:plc:owner"
+        {...props}
+      />,
+    )
+    expect(mockAnimatedCalls).toEqual([
+      ['did:plc:owner', size < 90 ? 'avatar_thumbnail' : 'avatar', false],
+    ])
+  }
+})
+
+it('requests playback for a visible animated avatar', () => {
+  render(
+    <UserAvatar type="user" size={48} avatar={avatar} did="did:plc:owner" />,
+  )
+  expect(mockAnimatedCalls).toEqual([['did:plc:owner', 'avatar_thumbnail', true]])
 })

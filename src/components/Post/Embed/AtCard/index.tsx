@@ -158,6 +158,7 @@ export function AtCard({
               ]}>
               <UserAvatar
                 avatar={displayedProfile?.avatar}
+                did={displayedProfile?.did}
                 size={32}
                 type="user"
               />

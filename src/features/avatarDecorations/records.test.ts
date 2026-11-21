@@ -1,3 +1,11 @@
+import {parseCidSafe} from '@atproto/lex'
+
+/*
+ * The repo registers a manual mock for multiformats/cid (__mocks__) that every
+ * test picks up automatically. These tests exercise real CID parsing.
+ */
+jest.unmock('multiformats/cid')
+
 import {
   buildDecorationRecord,
   getDecorationSettings,
@@ -215,5 +223,52 @@ describe('custom paint slots', () => {
     expect(
       buildDecorationRecord({nameOutline: true}, {nameFont: 'Inter'}),
     ).not.toHaveProperty('nameOutline')
+  })
+})
+
+describe('animated avatar slot', () => {
+  const blob = {
+    $type: 'blob' as const,
+    ref: parseCidSafe(
+      'bafkreiass37k5huajyfh6lzq6tndfhbsr6epvhoxz5diu4lj4rujcl3l4u',
+    )!,
+    mimeType: 'image/gif',
+    size: 2048,
+  }
+
+  it('reads a stored animation and keeps its cid', () => {
+    const parsed = parseDecorationSettings({
+      avatarAnimated: {
+        $type: 'blob',
+        ref: {$link: blob.ref.toString()},
+        mimeType: 'image/gif',
+        size: 2048,
+      },
+    })
+    const stored = parsed.avatarAnimated as {
+      mimeType: string
+      size?: number
+      ref: {toString: () => string}
+    }
+    expect(stored.mimeType).toBe('image/gif')
+    expect(stored.size).toBe(2048)
+    expect(stored.ref.toString()).toBe(blob.ref.toString())
+  })
+
+  it('drops an animation this build cannot render', () => {
+    expect(
+      parseDecorationSettings({
+        avatarAnimated: {$type: 'blob', ref: {$link: blob.ref.toString()}, mimeType: 'image/svg+xml', size: 10},
+      }),
+    ).toEqual({})
+  })
+
+  it('writes and clears the slot', () => {
+    expect(
+      buildDecorationRecord({}, {avatarAnimated: blob}).avatarAnimated,
+    ).toBe(blob)
+    expect(
+      buildDecorationRecord({avatarAnimated: blob}, {avatarAnimated: undefined}),
+    ).not.toHaveProperty('avatarAnimated')
   })
 })

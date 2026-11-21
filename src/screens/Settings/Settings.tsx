@@ -624,6 +624,7 @@ function ProfilePreview({
       <UserAvatar
         size={80}
         avatar={shadow.avatar}
+        did={shadow.did}
         moderation={moderation.ui('avatar')}
         type={shadow.associated?.labeler ? 'labeler' : 'user'}
         live={live}

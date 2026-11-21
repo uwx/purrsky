@@ -2650,6 +2650,7 @@ function ComposerAvatar({
   return (
     <UserAvatar
       avatar={profile?.avatar}
+      did={profile?.did}
       size={42}
       type={profile?.associated?.labeler ? 'labeler' : 'user'}
       decoration={decoration}

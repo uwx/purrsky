@@ -17,6 +17,7 @@ in its own PDS:
   avatarShape?: shape
   name?: gradientId // curated preset
   nameOutline?: boolean
+  avatarAnimated?: blob // GIF, WebP, APNG, or AVIF, played instead of the picture
   avatarColor?: string // #rrggbb, overrides the frame color
   nameColor?: string // #rrggbb, arbitrary solid name fill
   nameGradient?: {colors: string[]; hard?: boolean} // 2-3 #rrggbb stops
@@ -57,6 +58,18 @@ extra requests.
   unique per mounted instance: browsers resolve `url(#id)` to the first match in
   document order, so a shared id can resolve into an inactive screen kept
   mounted with `display: none`, which leaves the image unclipped.
+- **Animated picture** - `avatarAnimated` holds an uploaded blob, so the bytes
+  live in the owner's PDS and no third party has to be trusted with them. The
+  image CDN re-encodes every rendition and drops the animation, so playback
+  reads the blob straight from the owner's PDS
+  (`com.atproto.sync.getBlob`), resolved from their DID document on demand.
+  `UserAvatar` renders it with `expo-image`, which decodes animated GIF, WebP,
+  and APNG on both platforms. The still slot points at the same blob through
+  the CDN with `@png` - the first frame, with transparency intact - and is what
+  a reduced-motion viewer, a hexagon avatar, or a failed playback request gets.
+  A blob is only rendered when its mime type is one of GIF, WebP, APNG, or
+  AVIF and its size is under 4 MB, so a record cannot make a viewer fetch
+  arbitrary bytes.
 - **Name paint** - `namePaint.ts` resolves one record slot into
   `{gradient?, color?, outline, font?}`. Precedence is custom gradient, custom
   solid, then the curated `name` preset; `useNameStyle` turns the result into a
@@ -98,10 +111,18 @@ Two viewer-side display options (`state/preferences`) sit on top of the record:
 
 ## Editing
 
-Settings -> Profile decorations (`screens/Settings/DecorationsSettings.tsx`)
-previews the draft and writes the merged record with the user's own session. The
-draft state machine lives in `draft.ts` so the "untouched slots follow the saved
-record, touched slots win" rule is testable on its own. `buildDecorationRecord`
+The editor lives in the feature (`editor/DecorationsEditor.tsx`) and is rendered
+inline in the edit-profile dialog (`screens/Profile/Header/EditProfileDialog.tsx`),
+so decorations save with the rest of the profile. It owns no record state: the
+dialog keeps the draft and writes it before the profile record. Settings ->
+Profile decorations (`screens/Settings/DecorationsSettings.tsx`) hosts the same
+editor for the standalone route. The draft state machine lives in `draft.ts` so
+the "untouched slots follow the saved record, touched slots win" rule is testable
+on its own.
+
+An animated pick is uploaded on save (`useSaveDecorations`) before the record is
+written, because a record can only name bytes that already exist. The upload is
+not recompressed: transcoding would flatten the animation. `buildDecorationRecord`
 in `records.ts` owns the read-modify-write merge: `putRecord` replaces the whole
 record, so untouched slots must be carried over and cleared slots omitted. It
 also enforces one name paint at a time, so a record can hold a custom gradient

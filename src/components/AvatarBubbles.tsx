@@ -162,6 +162,7 @@ function AvatarBubble({
       {profile && moderationOpts ? (
         <UserAvatar
           avatar={profile.avatar}
+          did={profile.did}
           size={size}
           type="user"
           hideLiveBadge

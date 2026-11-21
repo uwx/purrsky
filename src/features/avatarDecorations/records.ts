@@ -1,3 +1,6 @@
+import {type BlobRef} from '@atproto/lex'
+
+import {parseAnimatedAvatarBlob} from './animatedAvatar'
 import {type AvatarShape, isAvatarShape} from './avatarShapes'
 import {normalizeHex} from './oklch'
 
@@ -36,6 +39,11 @@ export type DecorationSettings = {
   nameGradient?: NameGradientPaint
   /** Google Fonts family for the display name (googleFonts.ts). */
   nameFont?: string
+  /**
+   * Animated profile picture (animatedAvatar.ts), played instead of
+   * `app.bsky.actor.profile#avatar` by clients that understand it.
+   */
+  avatarAnimated?: BlobRef
 }
 
 /** Families are capped so a junk record cannot bloat a feed row. */
@@ -105,6 +113,7 @@ export function parseDecorationSettings(value: unknown): DecorationSettings {
   const record = value as Record<string, unknown>
   const nameGradient = parseNameGradient(record.nameGradient)
   const nameFont = parseFontFamily(record.nameFont)
+  const avatarAnimated = parseAnimatedAvatarBlob(record.avatarAnimated)
   return {
     ...(typeof record.avatar === 'string' ? {avatar: record.avatar} : {}),
     ...(isAvatarShape(record.avatarShape)
@@ -120,6 +129,7 @@ export function parseDecorationSettings(value: unknown): DecorationSettings {
       : {}),
     ...(nameGradient ? {nameGradient} : {}),
     ...(nameFont ? {nameFont} : {}),
+    ...(avatarAnimated ? {avatarAnimated} : {}),
   }
 }
 
@@ -168,5 +178,6 @@ export function buildDecorationRecord(
     ...(nameFont ? {nameFont} : {}),
     // The outline only means anything alongside a name paint.
     ...(hasNamePaint && next.nameOutline ? {nameOutline: true} : {}),
+    ...(next.avatarAnimated ? {avatarAnimated: next.avatarAnimated} : {}),
   }
 }

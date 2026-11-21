@@ -318,6 +318,7 @@ function KnownFollowerAvatar({
       <UserAvatar
         size={size}
         avatar={profile.avatar}
+        did={profile.did}
         moderation={moderation.ui('avatar')}
         type={profile.associated?.labeler ? 'labeler' : 'user'}
         decoration={decoration}

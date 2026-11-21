@@ -1,3 +1,11 @@
+import {parseCidSafe} from '@atproto/lex'
+
+/*
+ * The repo registers a manual mock for multiformats/cid (__mocks__) that every
+ * test picks up automatically. These tests exercise real CID parsing.
+ */
+jest.unmock('multiformats/cid')
+
 import {
   applyDraftEdit,
   draftFromSaved,
@@ -106,4 +114,43 @@ it('clears a color the user emptied instead of storing junk', () => {
     nameColor: '',
   })
   expect(draft.nameColor).toBeUndefined()
+})
+
+const CID = parseCidSafe(
+  'bafkreiass37k5huajyfh6lzq6tndfhbsr6epvhoxz5diu4lj4rujcl3l4u',
+)!
+const savedBlob = {
+  $type: 'blob' as const,
+  ref: CID,
+  mimeType: 'image/gif',
+  size: 2048,
+}
+
+it('follows a saved animation without turning the draft dirty', () => {
+  expect(
+    isDraftDirty(draftFromSaved({avatarAnimated: savedBlob}), {
+      avatarAnimated: savedBlob,
+    }),
+  ).toBe(false)
+})
+
+it('is dirty while a picked file is waiting to upload', () => {
+  const draft = applyDraftEdit(draftFromSaved({}), {avatarAnimated: savedBlob}, {
+    animatedPick: {mime: 'image/gif', path: 'file:///picked.gif', size: 100},
+    avatarAnimated: undefined,
+  })
+  expect(isDraftDirty(draft, {avatarAnimated: savedBlob})).toBe(true)
+})
+
+it('clears the animation slot when the user removes it', () => {
+  const savedWithBlob = {avatarAnimated: savedBlob}
+  const draft = applyDraftEdit(
+    draftFromSaved(savedWithBlob),
+    savedWithBlob,
+    {animatedPick: undefined, avatarAnimated: undefined},
+  )
+  expect(isDraftDirty(draft, savedWithBlob)).toBe(true)
+  expect(draftToPatch(draft, savedWithBlob)).toMatchObject({
+    avatarAnimated: undefined,
+  })
 })

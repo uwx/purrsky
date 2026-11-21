@@ -33,7 +33,6 @@ import * as Toggle from '#/components/forms/Toggle'
 import {ChevronRight_Stroke2_Corner0_Rounded as ChevronRightIcon} from '#/components/icons/Chevron'
 import {type Props as SVGIconProps} from '#/components/icons/common'
 import {Person_Stroke2_Corner2_Rounded as PersonIcon} from '#/components/icons/Person'
-import {Sparkle_Stroke2_Corner0_Rounded as SparkleIcon} from '#/components/icons/Sparkle'
 import {InlineLinkText} from '#/components/Link'
 import {Loader} from '#/components/Loader'
 import * as Prompt from '#/components/Prompt'
@@ -43,7 +42,16 @@ import {Text} from '#/components/Typography'
 import {useSimpleVerificationStateWithDeer} from '#/components/verification'
 import {useAnalytics} from '#/analytics'
 import {IS_WEB} from '#/env'
-import {useAvatarShape} from '#/features/avatarDecorations'
+import {
+  applyDraftEdit,
+  type DecorationDraft,
+  DecorationsEditor,
+  draftFromSaved,
+  isDraftDirty,
+  useAvatarShape,
+  useMyDecorationSettingsQuery,
+  useSaveDecorations,
+} from '#/features/avatarDecorations'
 import {
   logProfileLinkChanges,
   type ProfileLink,
@@ -199,6 +207,12 @@ function DialogInner({
   } = useProfileUpdateMutation()
   const [imageError, setImageError] = useState('')
   const witchHatControl = Dialog.useDialogControl()
+  const decorationSettings = useMyDecorationSettingsQuery()
+  const savedDecorations = decorationSettings.data ?? {}
+  const [decorationDraft, setDecorationDraft] = useState<DecorationDraft>(() =>
+    draftFromSaved(savedDecorations),
+  )
+  const saveDecorations = useSaveDecorations()
   const initialDisplayName = profile.displayName || ''
   const [displayName, setDisplayName] = useState(initialDisplayName)
   const initialDescription = profile.description || ''
@@ -259,7 +273,8 @@ function DialogInner({
     !!editedLinks &&
     !!storedLinks &&
     !sameProfileLinks(editedLinks, storedLinks)
-  const dirty = profileDirty || linksDirty
+  const decorationsDirty = isDraftDirty(decorationDraft, savedDecorations)
+  const dirty = profileDirty || linksDirty || decorationsDirty
 
   const enableSquareAvatars = useEnableSquareAvatars()
 
@@ -306,6 +321,25 @@ function DialogInner({
   const onPressSave = useCallback(async () => {
     setImageError('')
     try {
+      if (decorationsDirty) {
+        // Written first: the profile record and the decorations record are
+        // separate writes, and a failed decorations write must not leave the
+        // dialog claiming everything saved. Abort here so a half-saved profile
+        // never looks complete.
+        try {
+          const saved = await saveDecorations.mutateAsync({
+            draft: decorationDraft,
+            saved: savedDecorations,
+          })
+          setDecorationDraft(draftFromSaved(saved.next))
+        } catch (error) {
+          logger.error('Failed to save profile decorations', {
+            safeMessage: error,
+          })
+          Toast.show(l`Could not save your decorations. Try again.`)
+          return
+        }
+      }
       const nextLinks = linksDirty ? editedLinks : undefined
       // the profile can only point at link records that already exist
       const written = nextLinks
@@ -366,6 +400,10 @@ function DialogInner({
     l,
     editedLinks,
     linksDirty,
+    decorationsDirty,
+    decorationDraft,
+    savedDecorations,
+    saveDecorations,
     storedLinks,
     ax,
     writeProfileLinks,
@@ -429,6 +467,7 @@ function DialogInner({
         disabled={
           !dirty ||
           isUpdatingProfile ||
+          saveDecorations.isPending ||
           displayNameTooLong ||
           descriptionTooLong
         }
@@ -451,6 +490,7 @@ function DialogInner({
       dirty,
       onPressSave,
       isUpdatingProfile,
+      saveDecorations.isPending,
       displayNameTooLong,
       descriptionTooLong,
       enableSquareButtons,
@@ -672,19 +712,54 @@ function DialogInner({
           />
         )}
 
+        <View style={[a.gap_md]}>
+          <View style={[a.gap_2xs]}>
+            <Text style={[a.text_md, a.font_semi_bold]}>
+              <Trans>Profile decorations</Trans>
+            </Text>
+            <Text
+              style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
+              <Trans>
+                Avatar shape, frames, an animated picture, and name styles.
+                These are stored in your account and show up in apps that
+                support them.
+              </Trans>
+            </Text>
+          </View>
+          {decorationSettings.isLoading && <Loader />}
+          {decorationSettings.isError && (
+            <Button
+              label={l`Try again`}
+              size="small"
+              color="secondary"
+              onPress={() => void decorationSettings.refetch()}>
+              <ButtonText>
+                <Trans>Could not load your decorations. Try again.</Trans>
+              </ButtonText>
+            </Button>
+          )}
+          {decorationSettings.isSuccess && (
+            <DecorationsEditor
+              saved={savedDecorations}
+              draft={decorationDraft}
+              onEdit={patch =>
+                setDecorationDraft(current =>
+                  applyDraftEdit(current, savedDecorations, patch),
+                )
+              }
+              did={profile.did}
+              avatar={userAvatar}
+              displayName={displayName.trimEnd() || profile.handle}
+              handle={profile.handle}
+              disabled={isUpdatingProfile || saveDecorations.isPending}
+            />
+          )}
+        </View>
+
         <View style={[a.gap_sm]}>
           <TextField.LabelText>
             <Trans>More settings</Trans>
           </TextField.LabelText>
-          <SettingsShortcut
-            icon={SparkleIcon}
-            title={l`Profile decorations`}
-            description={l`Avatar shape, frames, and name styles`}
-            onPress={() =>
-              onNavigateAway(() => void navigate('DecorationsSettings'))
-            }
-            testID="editProfileDecorationsLink"
-          />
           <SettingsShortcut
             icon={PersonIcon}
             title={l`Account`}

@@ -1,3 +1,14 @@
+export {
+  type AnimatedAvatarPick,
+  animatedAvatarPlayUrl,
+  type AnimatedAvatarRejection,
+  avatarBlobCid,
+  avatarBlobStillUrl,
+  checkAnimatedAvatar,
+  isAnimatedAvatarMime,
+  MAX_ANIMATED_AVATAR_BYTES,
+  parseAnimatedAvatarBlob,
+} from './animatedAvatar'
 export {AvatarDecorationRing} from './AvatarDecorationRing'
 export {AVATAR_SHAPES, type AvatarShape, hexagonPath} from './avatarShapes'
 export {
@@ -15,6 +26,7 @@ export {
   isDraftDirty,
   resolveDraft,
 } from './draft'
+export {DecorationsEditor} from './editor/DecorationsEditor'
 export {
   fontCssUrl,
   type FontFace,
@@ -71,11 +83,15 @@ export {
   SETTINGS_RKEY,
 } from './records'
 export {
+  type AnimatedAvatarSource,
+  useAnimatedAvatar,
+  useAnimatedAvatarBlob,
   useAvatarDecoration,
   useAvatarShape,
   useMyDecorationSettings,
   useMyDecorationSettingsQuery,
   useNameGradient,
   useNameStyle,
+  useSaveDecorations,
   useSetDecorations,
 } from './useDecorations'

@@ -1,3 +1,6 @@
+import {type BlobRef} from '@atproto/lex'
+
+import {type AnimatedAvatarPick, avatarBlobCid} from './animatedAvatar'
 import {type AvatarShape} from './avatarShapes'
 import {normalizeHex} from './oklch'
 import {type DecorationSettings, type NameGradientPaint} from './records'
@@ -17,6 +20,13 @@ export type DecorationDraft = {
   nameColor?: string
   nameGradient?: NameGradientPaint
   nameFont?: string
+  /** Stored animated avatar; uploaded bytes replace it on save. */
+  avatarAnimated?: BlobRef
+  /**
+   * A file the owner picked but has not uploaded yet. Set means "use this on
+   * save"; clearing it together with `avatarAnimated` removes the animation.
+   */
+  animatedPick?: AnimatedAvatarPick
 }
 
 export function draftFromSaved(saved: DecorationSettings): DecorationDraft {
@@ -30,6 +40,7 @@ export function draftFromSaved(saved: DecorationSettings): DecorationDraft {
     nameColor: saved.nameColor,
     nameGradient: saved.nameGradient,
     nameFont: saved.nameFont,
+    avatarAnimated: saved.avatarAnimated,
   }
 }
 
@@ -106,6 +117,9 @@ export function isDraftDirty(
       resolved.avatarColor !== saved.avatarColor ||
       resolved.nameColor !== saved.nameColor ||
       resolved.nameFont !== saved.nameFont ||
+      !!resolved.animatedPick ||
+      avatarBlobCid(resolved.avatarAnimated) !==
+        avatarBlobCid(saved.avatarAnimated) ||
       !sameGradient(resolved.nameGradient, saved.nameGradient))
   )
 }
@@ -125,5 +139,11 @@ export function draftToPatch(
     nameColor: resolved.nameColor,
     nameGradient: resolved.nameGradient,
     nameFont: resolved.nameFont,
+    /*
+     * Always present so clearing the slot removes it from the record: the
+     * writer merges over the stored record and only an explicit undefined
+     * drops a key. A pending pick is replaced by the uploaded blob.
+     */
+    avatarAnimated: resolved.avatarAnimated,
   }
 }

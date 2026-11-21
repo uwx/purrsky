@@ -11,7 +11,7 @@ const domTests = [
   '<rootDir>/src/features/keyboardShortcuts/overlayNavigation.web.test.ts',
   '<rootDir>/src/features/avatarDecorations/Typography.web.test.tsx',
   '<rootDir>/src/features/avatarDecorations/HexagonAvatar.web.test.tsx',
-  '<rootDir>/src/screens/Settings/components/DecorationColorField/index.web.test.tsx',
+  '<rootDir>/src/features/avatarDecorations/editor/DecorationColorField/index.web.test.tsx',
 ]
 
 function preset(name) {

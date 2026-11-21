@@ -7,11 +7,13 @@ import {useNavigation} from '@react-navigation/native'
 
 import {type NavigationProp} from '#/lib/routes/types'
 import {isInvalidHandle} from '#/lib/strings/handles'
+import {getTagGradient} from '#/lib/tag-gradients'
 import {
   usePreferencesQuery,
   useRemoveMutedWordsMutation,
   useUpsertMutedWordsMutation,
 } from '#/state/queries/preferences'
+import {useTheme} from '#/alf'
 import {MagnifyingGlass_Stroke2_Corner0_Rounded as Search} from '#/components/icons/MagnifyingGlass'
 import {Mute_Stroke2_Corner0_Rounded as Mute} from '#/components/icons/Mute'
 import {Person_Stroke2_Corner0_Rounded as Person} from '#/components/icons/Person'
@@ -51,7 +53,14 @@ export function RichTextTag({
     reset: resetRemove,
   } = useRemoveMutedWordsMutation()
   const navigation = useNavigation<NavigationProp>()
+  const t = useTheme()
   const isCashtag = tag.startsWith('$')
+  /*
+   * Wafrn paints flags and a few joke tags with their own gradient. Cashtags
+   * are not tags, and the paint is per-theme because the raw stops include
+   * black and white that would disappear into the page.
+   */
+  const gradient = isCashtag ? undefined : getTagGradient(tag, t.scheme)
   const label = isCashtag ? _(msg`Cashtag ${tag}`) : _(msg`Hashtag ${tag}`)
   const hint = IS_NATIVE
     ? _(msg`Long press to open tag menu for ${isCashtag ? tag : `#${tag}`}`)
@@ -102,6 +111,7 @@ export function RichTextTag({
             accessibilityHint={hint}
             label={label}
             style={textStyle}
+            gradient={gradient}
             disableUnderline={disableUnderline}
             emoji>
             {IS_NATIVE ? (

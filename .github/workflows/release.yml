@@ -457,13 +457,13 @@ jobs:
           test -x "$NODE_BINARY"
           "$NODE_BINARY" --version
 
-      # Release configuration builds the JS bundle with Metro and Hermes in the
-      # "Bundle React Native code and images" phase, sourcing the
-      # .xcode.env.local checked above. Signing is disabled for every target,
-      # including the share, notification service and App Clip targets the
-      # config plugins add.
-      - name: Build
-        id: xcode
+      # The scheme the config plugins generate is named after the project; fall
+      # back to whatever the workspace lists first, never to a Pods aggregate
+      # scheme (it would build the pods and none of the app). xcodebuild prints
+      # a "Build settings from command line" preamble before the JSON, so only
+      # the object from the first `{` on is fed to jq.
+      - name: Find workspace and scheme
+        id: project
         run: |
           # Actions runs this shell with -e -o pipefail, so avoid pipelines that
           # can end early (head/grep -q) where the SIGPIPE would fail the step.
@@ -473,25 +473,57 @@ jobs:
           test -e "$workspace"
           set -- ios/*.xcodeproj
           project=$(basename "$1" .xcodeproj)
-          # The scheme the config plugins generate is named after the project;
-          # fall back to whatever the workspace lists first. xcodebuild prints a
-          # "Build settings from command line" preamble before the JSON, so only
-          # the object from the first `{` on is fed to jq.
           xcodebuild -list -json -workspace "$workspace" > build/xcode-list.raw.json
           sed -n '/^{/,$p' build/xcode-list.raw.json > build/xcode-list.json
           schemes=$(jq -r '.workspace.schemes[]' build/xcode-list.json)
           scheme=$(printf '%s\n' "$schemes" | grep -x -m1 -- "$project" || true)
           if [ -z "$scheme" ]; then
-            # Never start from a CocoaPods aggregate scheme: it would build the
-            # pods and none of the app.
             scheme=$(printf '%s\n' "$schemes" | grep -v -m1 '^Pods-' || true)
           fi
           test -n "$scheme"
           echo "workspace=$workspace scheme=$scheme"
+          echo "workspace=$workspace" >> "$GITHUB_OUTPUT"
           echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
+
+      # Xcode 26 ships the iOS platform as a downloadable component and some
+      # macos-26-arm64 image instances have it missing, which makes
+      # `generic/platform=iOS` resolve to nothing at all:
+      #   { platform:iOS, ... error:iOS 26.5 is not installed. Please download
+      #     and install the platform from Xcode > Settings > Components. }
+      # See actions/runner-images#14000. Installing it is the documented fix,
+      # and the download only happens on an instance that needs it.
+      - name: Ensure the iOS platform is installed
+        run: |
+          set -euo pipefail
+          # The probe runs against the device placeholder; the simulator
+          # runtimes were deleted above, so nothing else is listed. An eligible
+          # destination is any `platform:iOS,` line without the error.
+          destinations=$(xcodebuild \
+            -showdestinations \
+            -workspace "${{ steps.project.outputs.workspace }}" \
+            -scheme "${{ steps.project.outputs.scheme }}" 2>&1 || true)
+          printf '%s\n' "$destinations" | tail -40
+          eligible=$(printf '%s\n' "$destinations" \
+            | grep 'platform:iOS,' | grep -v 'error:' || true)
+          if [ -z "$eligible" ]; then
+            echo "No eligible iOS destination; installing the platform"
+            xcodebuild -showsdks || true
+            # Runner users are admins, so the plain call normally works; the
+            # sudo retry covers an image that installs Xcode root-owned.
+            xcodebuild -downloadPlatform iOS ||
+              sudo xcodebuild -downloadPlatform iOS
+          fi
+
+      # Release configuration builds the JS bundle with Metro and Hermes in the
+      # "Bundle React Native code and images" phase, sourcing the
+      # .xcode.env.local checked above. Signing is disabled for every target,
+      # including the share, notification service and App Clip targets the
+      # config plugins add.
+      - name: Build
+        run: |
           xcodebuild \
-            -workspace "$workspace" \
-            -scheme "$scheme" \
+            -workspace "${{ steps.project.outputs.workspace }}" \
+            -scheme "${{ steps.project.outputs.scheme }}" \
             -configuration Release \
             -destination 'generic/platform=iOS' \
             -derivedDataPath ios/build \
@@ -511,7 +543,7 @@ jobs:
       - name: Package IPA
         run: |
           products="ios/build/Build/Products/Release-iphoneos"
-          app="$products/${{ steps.xcode.outputs.scheme }}.app"
+          app="$products/${{ steps.project.outputs.scheme }}.app"
           if [ ! -d "$app" ]; then
             # The scheme is named after the Xcode project, whose product should
             # match; if it ever does not, the main app is the biggest bundle

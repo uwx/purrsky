@@ -1,0 +1,578 @@
+name: Release
+
+# One run builds both platforms so they can never drift apart: the APK and the
+# IPA share a version and land in a single GitHub release.
+#
+#   tag    witchsky-v<N>                 name  Witchsky v<N>
+#   files  witchsky-v<N>.apk, witchsky-v<N>.ipa
+#
+# <N> is the next free number in the release list rather than
+# `github.run_number`: this workflow replaces the two per-platform ones, so its
+# own run counter starts over at 1 and would collide with the tags already
+# published (the Android series is past v24). max(published, run_number) + 1
+# continues that series.
+#
+# iOS builds unsigned. There are no Apple Developer credentials in CI
+# (app.config.js only sets appleTeamId when WITCHSKY_APPLE_TEAM_ID is given),
+# so code signing is switched off and the .ipa is left for a sideloading tool
+# to re-sign with the installer's own certificate and provisioning profile:
+# Sideloadly, AltStore/SideStore, or TrollStore. It installs as-is only on a
+# jailbroken device. Because nothing is signed, entitlements are not applied
+# either - app groups, push notifications and the App Clip. Re-signing with a
+# certificate that supports those capabilities restores them.
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+    inputs:
+      targets:
+        type: choice
+        description: >-
+          What to build. "both" publishes the APK and the IPA together; the
+          single-platform choices are for iterating and publish that platform
+          alone.
+        options:
+          - both
+          - android
+          - ios
+        required: false
+        default: both
+      architectures:
+        type: string
+        description: >-
+          ABIs to compile into the APK, comma separated. Leave empty to build
+          every ABI in android/gradle.properties. The APK is universal, so
+          limiting this only drops architectures some devices cannot use.
+        required: false
+        default: "armeabi-v7a,arm64-v8a"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  # Runs first so both builds bake the same version into the binary, and so a
+  # run that never publishes cannot consume a number.
+  version:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      number: ${{ steps.next.outputs.number }}
+    steps:
+      - name: Compute release number
+        id: next
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          # Only the shared witchsky-vN tags count; the old per-platform
+          # witchsky-ios-vN tags are a separate, retired series.
+          last=$(gh release list --repo "$GITHUB_REPOSITORY" --limit 200 --json tagName \
+            --jq '[.[].tagName
+                   | select(test("^witchsky-v[0-9]+$"))
+                   | sub("^witchsky-v"; "")
+                   | tonumber] | max // 0')
+          number=$(( last + 1 ))
+          if [ "$number" -lt "${GITHUB_RUN_NUMBER:-1}" ]; then
+            number="${GITHUB_RUN_NUMBER:-1}"
+          fi
+          echo "number=$number" >> "$GITHUB_OUTPUT"
+          echo "Witchsky v$number"
+
+  android:
+    needs: version
+    if: inputs.targets != 'ios'
+    runs-on: ubuntu-latest
+    # React Native is compiled from source (expo-build-properties
+    # buildReactNativeFromSource), so this is the better part of an hour on a
+    # 4-core runner even with a warm ccache.
+    timeout-minutes: 180
+    env:
+      # EXPO_PUBLIC_* values are inlined into the bundle at build time, so they
+      # have to be set here. A value set anywhere later is too late.
+      EXPO_PUBLIC_ENV: production
+      EXPO_PUBLIC_OAUTH_BASE_URL: ${{ vars.OAUTH_BASE_URL || 'https://witchsky.app' }}
+      EXPO_PUBLIC_OAUTH_NATIVE_BASE_URL: ${{ vars.OAUTH_NATIVE_BASE_URL || 'https://app.puppykitty.racing' }}
+      EXPO_PUBLIC_APP_NAME: ${{ vars.APP_NAME || 'Purrsky' }}
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      EXPO_PUBLIC_BUNDLE_IDENTIFIER: ${{ github.sha }}
+      # Version code has to increase for every published release, otherwise
+      # Android refuses to install the update over the existing app. This is
+      # what EAS's autoIncrement does for the store builds.
+      BSKY_ANDROID_VERSION_CODE: ${{ needs.version.outputs.number }}
+      # ReactAndroid's CMakeLists, and the CMake project the app modules build
+      # through, both look for ccache on PATH and wrap every compile and link
+      # with it when it is there (a no-op when it is not).
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      CCACHE_MAXSIZE: 2G
+      # Production is what makes app.config.js turn OTA updates on, and the
+      # update channel is Bluesky's (updates.bsky.app), not ours. Left on, the
+      # APK would poll for a bundle matching this runtime version and could pull
+      # one that was never built from this source.
+      DISABLE_UPDATES: "1"
+      # There is no Sentry auth token here, and the upload task fails without
+      # one. See the sideload-android EAS profile and the local build script.
+      SENTRY_DISABLE_AUTO_UPLOAD: "true"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v7
+
+      # package.json requires node >=24.22.1 and devEngines pins pnpm 11.28.5.
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.28.5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+
+      # React Native and the app target Java 17 (see ReactAndroid's
+      # sourceCompatibility); Gradle 9.4 supports it.
+      - uses: actions/setup-java@v6
+        with:
+          distribution: temurin
+          java-version: 17
+
+      # `cache-provider: basic` keeps this on @actions/cache. The default in v6
+      # is gradle-actions-caching, which is licensed separately from the action.
+      # It caches Gradle User Home, which includes the local build cache below.
+      - uses: gradle/actions/setup-gradle@v6
+        with:
+          cache-provider: basic
+
+      # A from-source React Native build does not fit in the default runner
+      # disk, so drop toolchains this build has no use for.
+      - name: Free disk space
+        run: |
+          sudo rm -rf \
+            /usr/share/dotnet \
+            /opt/ghc \
+            /usr/local/share/boost \
+            /opt/hostedtoolcache/CodeQL \
+            "$ANDROID_HOME/system-images" \
+            "$ANDROID_HOME/emulator"
+          sudo docker image prune --all --force || true
+          df -h /
+
+      # The image has no ccache, and React Native only uses one it finds on
+      # PATH at CMake configure time.
+      - name: Install ccache
+        run: |
+          if ! command -v ccache > /dev/null; then
+            sudo apt-get update
+            sudo apt-get install -y ccache
+          fi
+          ccache --version | head -1
+
+      # The cache is content addressed, so a new key per run only means "save
+      # the state this run ended with"; restore-keys always picks the newest.
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: android-ccache-${{ hashFiles('pnpm-lock.yaml', 'patches/**') }}-${{ github.run_number }}
+          restore-keys: |
+            android-ccache-${{ hashFiles('pnpm-lock.yaml', 'patches/**') }}-
+            android-ccache-
+
+      # A restored entry brings its own ccache.conf back, so the limit is set
+      # after the restore. CCACHE_MAXSIZE would win over the file anyway; this
+      # keeps the conf the run saves consistent with it.
+      - name: Configure ccache
+        run: ccache --max-size="$CCACHE_MAXSIZE"
+
+      # The runner image installs the SDK but does not put cmdline-tools on
+      # PATH, so `sdkmanager` is not a command until we add it.
+      - name: Add sdkmanager to PATH
+        run: |
+          bin="$ANDROID_HOME/cmdline-tools/latest/bin"
+          if [ ! -x "$bin/sdkmanager" ]; then
+            bin=$(dirname "$(find "$ANDROID_HOME/cmdline-tools" -maxdepth 3 \
+              -name sdkmanager -type f | head -1)")
+          fi
+          test -x "$bin/sdkmanager"
+          echo "$bin" >> "$GITHUB_PATH"
+
+      - name: Accept SDK licenses
+        run: yes | sdkmanager --licenses > /dev/null || true
+
+      # React Native resolves its NDK from `ext.ndkVersion`, which the Expo
+      # Gradle plugin fills in from its version catalog (27.1.12297006 for this
+      # React Native release). The runner image ships 27.3, 29 and 30 instead.
+      # API 37 platforms are published per minor version and compileSdk 37 is
+      # satisfied only by "android-37.0". CMake is pinned to the version
+      # ReactAndroid/build.gradle.kts asks for; the image has 3.31.5, and AGP
+      # fails rather than substituting when the requested one is missing.
+      - name: Install Android SDK packages
+        run: |
+          sdkmanager --install \
+            "platforms;android-37.0" \
+            "build-tools;37.0.0" \
+            "ndk;27.1.12297006" \
+            "cmake;3.30.5"
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Relative to the run, so the ordering matches .env.example's YYMMDDHH.
+      - name: Write build metadata
+        run: |
+          version=$(node --print "require('./package.json').version")
+          bundle_date=$(date -u +%y%m%d%H)
+          echo "EXPO_PUBLIC_RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_BUNDLE_DATE=$bundle_date" >> "$GITHUB_ENV"
+
+      # app.config.js points android.googleServicesFile at this path and it is
+      # gitignored, so the checked-in example stands in for a real project.
+      - name: Copy example build settings
+        run: cp google-services.json.example google-services.json
+
+      # Same as `just intl:build`: the fork has no nightly catalog job, so the
+      # committed .po files drift and a build would otherwise ship message IDs.
+      - name: Build translations
+        run: pnpm intl:build
+
+      # Same as the justfile's `prebuild-android`. android/ is gitignored, so
+      # the native project is generated from app.config.js on every run.
+      - name: Prebuild native project
+        run: pnpm exec expo prebuild -p android
+        env:
+          EXPO_NO_GIT_STATUS: "1"
+
+      # Same as the justfile's `build-android-gradle`. android/gradle.properties
+      # builds all four ABIs by default, which is hours of extra native
+      # compilation; x86/x86_64 only matter to emulators, so default to the arm
+      # pair and let the dispatch input override it. --build-cache reuses task
+      # outputs (Kotlin, Java, dexing, minification) across runs through the
+      # Gradle User Home cache above.
+      - name: Build
+        working-directory: android
+        env:
+          ARCHITECTURES: ${{ inputs.architectures || 'armeabi-v7a,arm64-v8a' }}
+        run: |
+          args=()
+          if [ -n "$ARCHITECTURES" ]; then
+            args+=("-PreactNativeArchitectures=$ARCHITECTURES")
+          fi
+          chmod +x gradlew
+          ./gradlew app:assembleRelease --build-cache "${args[@]}"
+
+      - name: Ccache stats
+        if: always()
+        run: ccache --show-stats
+
+      - name: Rename APK
+        run: |
+          apk=android/app/build/outputs/apk/release/app-release.apk
+          test -f "$apk"
+          mv "$apk" "android/app/build/outputs/apk/release/witchsky-v${{ needs.version.outputs.number }}.apk"
+          ls -lh android/app/build/outputs/apk/release/witchsky-v${{ needs.version.outputs.number }}.apk
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: apk
+          if-no-files-found: error
+          path: android/app/build/outputs/apk/release/witchsky-v${{ needs.version.outputs.number }}.apk
+
+  ios:
+    needs: version
+    if: inputs.targets != 'android'
+    # macos-latest is macOS 26 arm64: Xcode 26.6 (iOS 26.5 SDK), CocoaPods
+    # 1.17 and Ruby 3.4 preinstalled. React Native is compiled from source
+    # (expo-build-properties buildReactNativeFromSource), which is the bulk of
+    # the runtime, so the job is capped at GitHub's 6 hour maximum.
+    runs-on: macos-latest
+    timeout-minutes: 360
+    env:
+      # EXPO_PUBLIC_* values are inlined into the bundle at build time, so they
+      # have to be set here. A value set anywhere later is too late.
+      EXPO_PUBLIC_ENV: production
+      EXPO_PUBLIC_OAUTH_BASE_URL: ${{ vars.OAUTH_BASE_URL || 'https://witchsky.app' }}
+      EXPO_PUBLIC_OAUTH_NATIVE_BASE_URL: ${{ vars.OAUTH_NATIVE_BASE_URL || 'https://app.puppykitty.racing' }}
+      EXPO_PUBLIC_APP_NAME: ${{ vars.APP_NAME || 'Purrsky' }}
+      EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
+      EXPO_PUBLIC_BUNDLE_IDENTIFIER: ${{ github.sha }}
+      # app.config.js also reads this for the icon choice: only `ios` gets the
+      # .icon (Icon Composer) asset, and only `ios` gets the .aiff notification
+      # sound. Must be set before prebuild, which consumes the config.
+      EAS_BUILD_PLATFORM: ios
+      # app.config.js leaves DEVELOPMENT_TEAM out when this is unset, which
+      # keeps prebuild from writing an unreadable placeholder. Signing is
+      # disabled below, so no team is validated anyway.
+      BSKY_IOS_BUILD_NUMBER: ${{ needs.version.outputs.number }}
+      # Lets a dispatch override the bundle identifier, e.g. to install next to
+      # the App Store build, since a sideloaded app cannot replace it in place.
+      WITCHSKY_BUNDLE_ID: ${{ vars.WITCHSKY_BUNDLE_ID || 'app.witchsky' }}
+      # Production is what makes app.config.js turn OTA updates on, and the
+      # update channel is Bluesky's (updates.bsky.app), not ours. Left on, the
+      # IPA would poll for a bundle matching this runtime version and could pull
+      # one that was never built from this source.
+      DISABLE_UPDATES: "1"
+      # There is no Sentry auth token here, and the upload task fails without
+      # one. See the sideload-android EAS profile and the local build script.
+      SENTRY_DISABLE_AUTO_UPLOAD: "true"
+      # The Podfile template in Expo SDK 58 reads this before the
+      # `apple.ccacheEnabled` Podfile property, so it turns on React Native's
+      # ccache wrapping (CC/CXX/LD in every target) without changing the app
+      # config that local and EAS builds share.
+      USE_CCACHE: "1"
+      CCACHE_DIR: ${{ github.workspace }}/.ccache
+      # React Native's wrapper points ccache at its own conf file through
+      # CCACHE_CONFIGPATH, so a size set in the cache directory's conf would
+      # never be read. The environment variable takes precedence over any conf.
+      CCACHE_MAXSIZE: 2G
+      # Homebrew updates and cleanup are slow and irrelevant to a one-shot
+      # install of a single bottle.
+      HOMEBREW_NO_AUTO_UPDATE: "1"
+      HOMEBREW_NO_INSTALL_CLEANUP: "1"
+      NODE_OPTIONS: --max-old-space-size=4096
+    steps:
+      - uses: actions/checkout@v7
+
+      # package.json requires node >=24.22.1 and devEngines pins pnpm 11.28.5.
+      - uses: pnpm/action-setup@v6
+        with:
+          version: 11.28.5
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24.22.1
+          cache: pnpm
+
+      # The image ships six Xcode versions plus iOS/tvOS/watchOS/visionOS
+      # simulator runtimes, an Android SDK and several language toolchains -
+      # tens of gigabytes this job never reads. A from-source React Native
+      # build does not fit on the default volume without reclaiming them.
+      # The active Xcode is resolved through its symlinks so it can never be
+      # selected for deletion.
+      - name: Free disk space
+        run: |
+          df -h /
+          active_app="$(xcode-select -p)"; active_app="${active_app%/Contents/Developer}"
+          active_real="$(cd "$active_app" && pwd -P)"
+          echo "Keeping $active_real"
+          for xc in /Applications/Xcode*.app; do
+            if [ "$(cd "$xc" && pwd -P)" = "$active_real" ]; then continue; fi
+            echo "Removing $xc"
+            sudo rm -rf "$xc"
+          done
+          sudo rm -rf /Library/Developer/CoreSimulator
+          rm -rf "$HOME/Library/Developer/CoreSimulator"
+          sudo rm -rf "$HOME/Library/Android" /usr/local/share/dotnet
+          rm -rf "$HOME/.rustup" "$HOME/.dotnet" "$HOME/Library/Caches/Homebrew"
+          df -h /
+
+      # The image has no ccache. pod install below records the absolute path of
+      # this binary into every target's build settings, so it has to exist
+      # before CocoaPods runs.
+      - name: Install ccache
+        run: |
+          brew install ccache
+          ccache --version | head -1
+
+      # Compiler results only: they are keyed by content, so a regenerated
+      # project (new UUIDs, new paths) still hits, and a stale cache can only
+      # cost a rebuild. A new key per run means this run's results get saved;
+      # restore-keys always take the newest.
+      - name: Restore ccache
+        uses: actions/cache@v6
+        with:
+          path: .ccache
+          key: ios-ccache-${{ hashFiles('pnpm-lock.yaml', 'patches/**') }}-${{ github.run_number }}
+          restore-keys: |
+            ios-ccache-${{ hashFiles('pnpm-lock.yaml', 'patches/**') }}-
+            ios-ccache-
+
+      # Pod sources and the CDN spec shards, plus the React Native tarball
+      # cache its download helpers keep in ~/Library/Caches/ReactNative. Pure
+      # downloads, so a stale entry can only mean a re-download.
+      - name: Restore CocoaPods caches
+        uses: actions/cache@v6
+        with:
+          path: |
+            ~/.cocoapods
+            ~/Library/Caches/CocoaPods
+            ~/Library/Caches/ReactNative
+          key: ios-pods-${{ hashFiles('pnpm-lock.yaml', 'patches/**', 'app.config.js') }}
+          restore-keys: |
+            ios-pods-
+
+      - name: Show Xcode version
+        run: xcodebuild -version
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # Relative to the run, so the ordering matches .env.example's YYMMDDHH.
+      - name: Write build metadata
+        run: |
+          version=$(node --print "require('./package.json').version")
+          bundle_date=$(date -u +%y%m%d%H)
+          echo "EXPO_PUBLIC_RELEASE_VERSION=$version" >> "$GITHUB_ENV"
+          echo "EXPO_PUBLIC_BUNDLE_DATE=$bundle_date" >> "$GITHUB_ENV"
+
+      # app.config.js points android.googleServicesFile at this path and it is
+      # gitignored, so the checked-in example stands in for a real project.
+      # Only iOS is prebuilt, but the config is evaluated for both platforms.
+      - name: Copy example build settings
+        run: cp google-services.json.example google-services.json
+
+      # Same as `just intl:build`: the fork has no nightly catalog job, so the
+      # committed .po files drift and a build would otherwise ship message IDs.
+      - name: Build translations
+        run: pnpm intl:build
+
+      # ios/ is gitignored, so the native project is generated from
+      # app.config.js on every run. The CocoaPods step is run separately below
+      # so a pods failure is not reported as a prebuild failure.
+      - name: Prebuild native project
+        run: pnpm exec expo prebuild -p ios --no-install
+        env:
+          EXPO_NO_GIT_STATUS: "1"
+          CI: "1"
+
+      # The checked-in Gemfile pins Ruby 2.7.6 via .ruby-version, which this
+      # runner does not have, so bundler is skipped and the image's own
+      # CocoaPods (Homebrew, vendored Ruby) runs the Podfile directly.
+      - name: Install CocoaPods dependencies
+        working-directory: ios
+        run: pod install
+
+      # `pod install` writes .xcode.env.local with the absolute path of the node
+      # it found, and Xcode's script phases source it. It is the only thing
+      # that hands node to Metro's bundle phase, since those phases do not get
+      # the runner's PATH; without it the build would silently ship a .app
+      # with no JS bundle.
+      - name: Check node path for Xcode
+        run: |
+          cat ios/.xcode.env.local
+          . ios/.xcode.env.local
+          test -x "$NODE_BINARY"
+          "$NODE_BINARY" --version
+
+      # Release configuration builds the JS bundle with Metro and Hermes in the
+      # "Bundle React Native code and images" phase, sourcing the
+      # .xcode.env.local checked above. Signing is disabled for every target,
+      # including the share, notification service and App Clip targets the
+      # config plugins add.
+      - name: Build
+        id: xcode
+        run: |
+          # Actions runs this shell with -e -o pipefail, so avoid pipelines that
+          # can end early (head/grep -q) where the SIGPIPE would fail the step.
+          mkdir -p build
+          set -- ios/*.xcworkspace
+          workspace=$1
+          test -e "$workspace"
+          set -- ios/*.xcodeproj
+          project=$(basename "$1" .xcodeproj)
+          # The scheme the config plugins generate is named after the project;
+          # fall back to whatever the workspace lists first. xcodebuild prints a
+          # "Build settings from command line" preamble before the JSON, so only
+          # the object from the first `{` on is fed to jq.
+          xcodebuild -list -json -workspace "$workspace" > build/xcode-list.raw.json
+          sed -n '/^{/,$p' build/xcode-list.raw.json > build/xcode-list.json
+          schemes=$(jq -r '.workspace.schemes[]' build/xcode-list.json)
+          scheme=$(printf '%s\n' "$schemes" | grep -x -m1 -- "$project" || true)
+          if [ -z "$scheme" ]; then
+            # Never start from a CocoaPods aggregate scheme: it would build the
+            # pods and none of the app.
+            scheme=$(printf '%s\n' "$schemes" | grep -v -m1 '^Pods-' || true)
+          fi
+          test -n "$scheme"
+          echo "workspace=$workspace scheme=$scheme"
+          echo "scheme=$scheme" >> "$GITHUB_OUTPUT"
+          xcodebuild \
+            -workspace "$workspace" \
+            -scheme "$scheme" \
+            -configuration Release \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath ios/build \
+            COMPILER_INDEX_STORE_ENABLE=NO \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Ccache stats
+        if: always()
+        run: ccache --show-stats
+
+      # An unsigned .app is packed exactly like a signed one: Payload/<name>.app
+      # inside a zip renamed to .ipa. ditto preserves symlinks and extended
+      # attributes inside frameworks, where cp -R can lose them.
+      - name: Package IPA
+        run: |
+          products="ios/build/Build/Products/Release-iphoneos"
+          app="$products/${{ steps.xcode.outputs.scheme }}.app"
+          if [ ! -d "$app" ]; then
+            # The scheme is named after the Xcode project, whose product should
+            # match; if it ever does not, the main app is the biggest bundle
+            # because everything else is embedded inside it.
+            app=$(du -sk "$products"/*.app \
+              | awk '$1 > max {max = $1; path = $2} END {print path}')
+          fi
+          test -d "$app"
+          mkdir -p build/Payload
+          ditto "$app" "build/Payload/$(basename "$app")"
+          ipa="build/witchsky-v${{ needs.version.outputs.number }}.ipa"
+          (cd build && zip -qry -X "$(basename "$ipa")" Payload)
+          # The bundle lives at the app root; its absence means the Metro phase
+          # was skipped and the build is not installable.
+          unzip -l "$ipa" > build/ipa-contents.txt
+          grep 'Payload/[^/]*\.app/main\.jsbundle' build/ipa-contents.txt
+          ls -lh "$ipa"
+
+      - name: Upload artifact
+        uses: actions/upload-artifact@v7
+        with:
+          name: ipa
+          if-no-files-found: error
+          path: build/witchsky-v${{ needs.version.outputs.number }}.ipa
+
+  # One release for both platforms. A job rather than a step in each build so
+  # the two uploads cannot race on tag creation, and `if: always()` keeps a
+  # failing platform from taking the other one down: the artifacts that did get
+  # built are still published under that version.
+  publish:
+    needs: [version, android, ios]
+    if: >-
+      always() && !cancelled() && github.ref_name == 'main' &&
+      needs.version.result == 'success' &&
+      (needs.android.result == 'success' || needs.ios.result == 'success')
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      # softprops/action-gh-release creates the tag and release
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          path: dist
+          merge-multiple: true
+
+      - name: List release files
+        run: ls -lh dist
+
+      - name: Publish release
+        uses: softprops/action-gh-release@v3
+        with:
+          name: Witchsky v${{ needs.version.outputs.number }}
+          tag_name: witchsky-v${{ needs.version.outputs.number }}
+          body: |
+            Android APK and unsigned iOS IPA built from the same commit.
+
+            The IPA is not signed and carries no entitlements. Re-sign it with
+            Sideloadly, AltStore/SideStore or TrollStore before installing;
+            only a jailbroken device takes it as-is.
+          files: |
+            dist/*.apk
+            dist/*.ipa
+          fail_on_unmatched_files: false

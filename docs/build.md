@@ -84,15 +84,31 @@ This is NOT required when developing for web.
 
 After you do `pnpm ios` and `pnpm android` once, you can later just run `pnpm web` and then press either `i` or `a` to open iOS and Android emulators respectively which is much faster. However, if you make native changes, you'll have to do `pnpm prebuild -p ios` and `pnpm prebuild -p android` and then `pnpm ios` and `pnpm android` again before you can continue with the same workflow.
 
-### iOS IPA without a Mac
+### App releases without a Mac
 
-`.github/workflows/build-ios.yml` builds an unsigned device IPA on `macos-latest`: prebuild, `pod install`, then a Release `xcodebuild` with code signing disabled. Every run uploads the IPA as an artifact, and a push to `main` also publishes it as a `witchsky-ios-vN` GitHub release.
+`.github/workflows/release.yml` builds the Android APK on `ubuntu-latest` and the unsigned iOS IPA on `macos-latest` in the same run, then publishes both from one job:
+
+```
+tag    witchsky-v<N>
+files  witchsky-v<N>.apk     (arm)
+       witchsky-v<N>.ipa     (unsigned, device)
+```
+
+`<N>` is one past the highest published `witchsky-v<N>` release, not `github.run_number`, so the series continues across workflow rewrites and a run that publishes nothing cannot consume a number. Both binaries get the same number as their version code / build number. A `workflow_dispatch` with `targets: android` or `targets: ios` builds and publishes just that platform; `architectures` limits the APK ABIs.
 
 There are no Apple credentials in CI, so nothing is signed and no entitlements are applied - not the app groups, push notifications, or the App Clip. Re-sign the IPA with Sideloadly, AltStore/SideStore, or TrollStore before installing; only a jailbroken device takes it as-is. Re-signing with a certificate that supports those capabilities restores them.
 
-Two optional repository variables change the build without a code change: `WITCHSKY_BUNDLE_ID` (default `app.witchsky`) picks the bundle identifier, so a build can sit next to an App Store install, and `WITCHSKY_APPLE_TEAM_ID` sets `DEVELOPMENT_TEAM`.
+Two optional repository variables change the iOS build without a code change: `WITCHSKY_BUNDLE_ID` (default `app.witchsky`) picks the bundle identifier, so a build can sit next to an App Store install, and `WITCHSKY_APPLE_TEAM_ID` sets `DEVELOPMENT_TEAM`.
 
-The job compiles React Native from source (`buildReactNativeFromSource`) on a 3-core runner, so it takes about an hour, and it deletes the unused Xcode installs and simulator runtimes first to make room.
+Both platforms compile React Native from source (`buildReactNativeFromSource`), which is the bulk of the runtime. The iOS job deletes the unused Xcode installs and simulator runtimes first to make room on the runner disk. Every run restores and saves these caches:
+
+| Cache | Covers |
+| --- | --- |
+| `.ccache` (workspace) | compiler results, through ccache: `pod install` for iOS (the Podfile template turns it on for `USE_CCACHE=1`), and `ReactAndroid`'s CMake for Android when `ccache` is on `PATH` |
+| `~/.cocoapods`, `~/Library/Caches/CocoaPods`, `~/Library/Caches/ReactNative` | CocoaPods spec shards and pod source archives, Hermes/prebuilt RN tarballs |
+| Gradle User Home | dependencies and, with `--build-cache`, task outputs |
+
+The ccache entries are keyed by content, so a regenerated `ios/` project (new UUIDs every prebuild) still hits; the first run after a lockfile change pays the full compile, later runs do not.
 
 ### Tips
 

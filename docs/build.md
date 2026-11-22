@@ -100,7 +100,7 @@ There are no Apple credentials in CI, so nothing is signed and no entitlements a
 
 Two optional repository variables change the iOS build without a code change: `WITCHSKY_BUNDLE_ID` (default `app.witchsky`) picks the bundle identifier, so a build can sit next to an App Store install, and `WITCHSKY_APPLE_TEAM_ID` sets `DEVELOPMENT_TEAM`.
 
-Both platforms compile React Native from source (`buildReactNativeFromSource`), which is the bulk of the runtime. The iOS job deletes the unused Xcode installs and simulator runtimes first to make room on the runner disk. Every run restores and saves these caches:
+Both platforms compile React Native from source (`buildReactNativeFromSource`), which is the bulk of the runtime. The iOS job deletes the unused Xcode installs and simulator runtimes first to make room on the runner disk. Xcode 26 ships the iOS platform as a downloadable component and some `macos-26-arm64` image instances come up without it, so the job probes `xcodebuild -showdestinations` and runs `xcodebuild -downloadPlatform iOS` when no device destination resolves. Every run restores and saves these caches:
 
 | Cache | Covers |
 | --- | --- |

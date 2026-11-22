@@ -161,3 +161,21 @@ export function activeThemeToScheme(activeTheme: ActiveTheme) {
     dim: dimTheme,
   }
 }
+
+/**
+ * One authored color set rendered as a complete scheme, for a subtree that
+ * shows a theme as content rather than as the viewer's preference (a profile
+ * theme). Every slot resolves to the same colors and the author's own mode, so
+ * the page keeps its published look whatever appearance mode the viewer runs.
+ */
+export function colorSetToScheme(set: ThemeColorSet, mode: ThemeMode) {
+  const theme = themeFor(set, mode, mode)
+  return {
+    lightPalette: theme.palette,
+    darkPalette: theme.palette,
+    dimPalette: theme.palette,
+    light: theme,
+    dark: theme,
+    dim: {...theme, name: 'dim' as const},
+  }
+}

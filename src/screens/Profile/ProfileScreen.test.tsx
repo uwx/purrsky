@@ -1,3 +1,4 @@
+import type * as AlfModule from '@bsky.app/alf'
 import {act, render, screen} from '@testing-library/react-native'
 
 import {useProfileQuery} from '#/state/queries/profile'
@@ -51,12 +52,22 @@ jest.mock('#/lib/strings/display-names', () => ({
 }))
 jest.mock('#/lib/userstyles', () => ({userStyle: () => ({})}))
 jest.mock('#/lib/styles', () => ({colors: {}}))
-jest.mock('#/alf', () => ({
-  atoms: jest.requireActual<typeof import('@bsky.app/alf')>('@bsky.app/alf').atoms,
-  platform: (value: unknown) => value,
-  useTheme: () => ({atoms: {}}),
-  useBreakpoints: () => ({gtMobile: false}),
-}))
+jest.mock('#/alf', () => {
+  const actual = jest.requireActual<typeof AlfModule>('@bsky.app/alf')
+  return {
+    atoms: actual.atoms,
+    platform: (value: unknown) => value,
+    useTheme: () => ({atoms: {}}),
+    useBreakpoints: () => ({gtMobile: false}),
+    useAlf: () => ({
+      themeName: 'light',
+      theme: actual.themes.light,
+      themes: actual.themes,
+      fonts: {},
+      flags: {},
+    }),
+  }
+})
 jest.mock('@bsky/sdk/moderation', () => ({
   DEFAULT_LABEL_SETTINGS: {},
   moderateProfile: () => ({ui: () => ({})}),

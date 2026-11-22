@@ -26,6 +26,7 @@ import {
   Bookmark_Filled_Corner0_Rounded as BookmarkFilled,
   Bookmark_Stroke2_Corner0_Rounded as Bookmark,
 } from '#/components/icons/Bookmark'
+import {ColorPalette_Stroke2_Corner0_Rounded as ColorPaletteIcon} from '#/components/icons/ColorPalette'
 import {DotGrid3x1_Stroke2_Corner0_Rounded as EllipsisIcon} from '#/components/icons/DotGrid'
 import {Pencil_Stroke2_Corner0_Rounded as PencilIcon} from '#/components/icons/Pencil'
 import * as Layout from '#/components/Layout'
@@ -33,8 +34,14 @@ import {InlineLinkText} from '#/components/Link'
 import {Loader} from '#/components/Loader'
 import * as Menu from '#/components/Menu'
 import {RichText} from '#/components/RichText'
+import * as Toast from '#/components/Toast'
 import {Text} from '#/components/Typography'
 import {IS_WEB} from '#/env'
+import {
+  type ProfileThemeRef,
+  useMyDecorationSettings,
+  useSetDecorations,
+} from '#/features/avatarDecorations'
 import {
   useApplyTheme,
   useSaveTheme,
@@ -107,6 +114,8 @@ export function ThemeScreen({route, navigation}: Props) {
   const creator = useProfileQuery({did: theme?.author})
   const library = useThemeLibrary()
   const applyTheme = useApplyTheme()
+  const decorations = useMyDecorationSettings()
+  const setDecorations = useSetDecorations()
   const [selectedSet, setSelectedSet] = useState<string>()
 
   const activeSelection = rawActiveSelection
@@ -202,6 +211,22 @@ export function ThemeScreen({route, navigation}: Props) {
               rkey={route.params.rkey}
               shareName={route.params.name}
               remixColorSet={selected.name}
+              profileTheme={decorations.profileTheme}
+              onSetProfileTheme={ref =>
+                setDecorations.mutate(
+                  {profileTheme: ref},
+                  {
+                    onSuccess: () =>
+                      Toast.show(
+                        ref
+                          ? _(msg`Profile theme updated`)
+                          : _(msg`Profile theme removed`),
+                      ),
+                    onError: () =>
+                      Toast.show(_(msg`Could not update your profile theme`)),
+                  },
+                )
+              }
             />
           </View>
         ) : (
@@ -414,6 +439,8 @@ function ThemePageMenu({
   rkey,
   shareName,
   remixColorSet,
+  profileTheme,
+  onSetProfileTheme,
 }: {
   theme: ThemeView
   savedRecordUri?: string
@@ -421,13 +448,17 @@ function ThemePageMenu({
   rkey: string
   shareName: string
   remixColorSet: string
+  profileTheme?: ProfileThemeRef
+  onSetProfileTheme: (ref: ProfileThemeRef | undefined) => void
 }) {
   const {_} = useLingui()
   const {currentAccount} = useSession()
   const saveTheme = useSaveTheme()
   const unsaveTheme = useUnsaveTheme()
   const navigation = useNavigation<NavigationProp>()
-
+  const isProfileTheme =
+    profileTheme?.uri === theme.uri &&
+    (profileTheme.colorSet ?? theme.record.base.name) === remixColorSet
   return (
     <Menu.Root>
       <Menu.Trigger label={_(msg`Open theme actions`)}>
@@ -483,6 +514,31 @@ function ThemePageMenu({
               <Trans>Edit</Trans>
             </Menu.ItemText>
             <Menu.ItemIcon icon={PencilIcon} position="right" />
+          </Menu.Item>
+        )}
+        {currentAccount && (
+          <Menu.Item
+            testID="setProfileThemeMenuItem"
+            label={
+              isProfileTheme
+                ? _(msg`Remove profile theme`)
+                : _(msg`Set as profile theme`)
+            }
+            onPress={() =>
+              onSetProfileTheme(
+                isProfileTheme
+                  ? undefined
+                  : {uri: theme.uri, colorSet: remixColorSet},
+              )
+            }>
+            <Menu.ItemText>
+              {isProfileTheme ? (
+                <Trans>Remove profile theme</Trans>
+              ) : (
+                <Trans>Set as profile theme</Trans>
+              )}
+            </Menu.ItemText>
+            <Menu.ItemIcon icon={ColorPaletteIcon} position="right" />
           </Menu.Item>
         )}
         <Menu.Item

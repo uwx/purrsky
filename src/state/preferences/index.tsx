@@ -57,6 +57,7 @@ import {Provider as PasteToLinkEnabledProvider} from './paste-to-link-enabled'
 import {Provider as PdsLabelProvider} from './pds-label'
 import {Provider as PlcDirectoryProvider} from './plc-directory'
 import {Provider as PostNameReplacementProvider} from './post-name-replacement.tsx'
+import {Provider as ProfileThemesProvider} from './profile-themes'
 import {Provider as RenderBridgedHtmlProvider} from './render-bridged-html'
 import {Provider as ReplyIconIndicatorsProvider} from './reply-icon-indicators'
 import {Provider as RepostCarouselProvider} from './repost-carousel-enabled'
@@ -140,10 +141,7 @@ export {
 export {useImageCdnHost, useSetImageCdnHost} from './image-cdn-host'
 export {useLabelDefinitions} from './label-defs'
 export {useLanguagePrefs, useLanguagePrefsApi} from './languages'
-export {
-  useSetShowNameOutlines,
-  useShowNameOutlines,
-} from './name-outlines'
+export {useSetShowNameOutlines, useShowNameOutlines} from './name-outlines'
 export {useOmitViaField, useSetOmitViaField} from './omit-via-field'
 export {
   useOpenRouterApiKey,
@@ -161,6 +159,10 @@ export {
   usePlcDirectory,
   useSetPlcDirectory,
 } from './plc-directory'
+export {
+  useDisableProfileThemes,
+  useSetDisableProfileThemes,
+} from './profile-themes'
 export {
   useRenderBridgedHtml,
   useSetRenderBridgedHtml,
@@ -279,29 +281,31 @@ export function Provider({children}: PropsWithChildren<{}>) {
                                                                                                                                                     <DisableInfiniteScrollProvider>
                                                                                                                                                       <HideBluemojiReactionsProvider>
                                                                                                                                                         <HideOwnFictionkinBadgeProvider>
-                                                                                                                                                        <HideQuotesOfBlockedAccountsProvider>
-                                                                                                                                                          <ReplyIconIndicatorsProvider>
-                                                                                                                                                            <ShowPostTagsProvider>
-                                                                                                                                                              <EmojiFontProvider>
-                                                                                                                                                                <PasteToLinkEnabledProvider>
-                                                                                                                                                                  <TagSearchInstanceProvider>
-                                                                                                                                                                    <DeckLayoutProvider>
-                                                                                                                                                                      <ShowThreadPostNumbersProvider>
-                                                                                                                                                                        <NameOutlinesProvider>
-                                                                                                                                                                          <CustomNameStylesProvider>
-                                                                                                                                                                            {
-                                                                                                                                                                              children
-                                                                                                                                                                            }
-                                                                                                                                                                          </CustomNameStylesProvider>
-                                                                                                                                                                        </NameOutlinesProvider>
-                                                                                                                                                                      </ShowThreadPostNumbersProvider>
-                                                                                                                                                                    </DeckLayoutProvider>
-                                                                                                                                                                  </TagSearchInstanceProvider>
-                                                                                                                                                                </PasteToLinkEnabledProvider>
-                                                                                                                                                              </EmojiFontProvider>
-                                                                                                                                                            </ShowPostTagsProvider>
-                                                                                                                                                          </ReplyIconIndicatorsProvider>
-                                                                                                                                                        </HideQuotesOfBlockedAccountsProvider>
+                                                                                                                                                          <HideQuotesOfBlockedAccountsProvider>
+                                                                                                                                                            <ReplyIconIndicatorsProvider>
+                                                                                                                                                              <ShowPostTagsProvider>
+                                                                                                                                                                <EmojiFontProvider>
+                                                                                                                                                                  <PasteToLinkEnabledProvider>
+                                                                                                                                                                    <TagSearchInstanceProvider>
+                                                                                                                                                                      <DeckLayoutProvider>
+                                                                                                                                                                        <ShowThreadPostNumbersProvider>
+                                                                                                                                                                          <NameOutlinesProvider>
+                                                                                                                                                                            <CustomNameStylesProvider>
+                                                                                                                                                                              <ProfileThemesProvider>
+                                                                                                                                                                                {
+                                                                                                                                                                                  children
+                                                                                                                                                                                }
+                                                                                                                                                                              </ProfileThemesProvider>
+                                                                                                                                                                            </CustomNameStylesProvider>
+                                                                                                                                                                          </NameOutlinesProvider>
+                                                                                                                                                                        </ShowThreadPostNumbersProvider>
+                                                                                                                                                                      </DeckLayoutProvider>
+                                                                                                                                                                    </TagSearchInstanceProvider>
+                                                                                                                                                                  </PasteToLinkEnabledProvider>
+                                                                                                                                                                </EmojiFontProvider>
+                                                                                                                                                              </ShowPostTagsProvider>
+                                                                                                                                                            </ReplyIconIndicatorsProvider>
+                                                                                                                                                          </HideQuotesOfBlockedAccountsProvider>
                                                                                                                                                         </HideOwnFictionkinBadgeProvider>
                                                                                                                                                       </HideBluemojiReactionsProvider>
                                                                                                                                                     </DisableInfiniteScrollProvider>

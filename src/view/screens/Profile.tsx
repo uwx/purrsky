@@ -62,6 +62,10 @@ import {ProfileStarterPacks} from '#/components/StarterPack/ProfileStarterPacks'
 import {ProfilePacks} from '#/features/bluemoji/packs/ProfilePacks'
 import {ProfileEvents} from '#/features/events/components/ProfileEvents'
 import {accentForeground} from '#/features/themes/accentForeground'
+import {
+  ProfileThemeScope,
+  useProfileTheme,
+} from '#/features/themes/profileTheme'
 import {type app} from '#/lexicons'
 import {navigate} from '#/Navigation'
 
@@ -70,7 +74,17 @@ interface SectionRef {
 }
 
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'Profile'>
+
 export function ProfileScreen(props: Props) {
+  return <ProfileScreenInner {...props} />
+}
+
+/**
+ * Screen frame shared by every branch. Lives inside the profile theme scope
+ * for a loaded profile so the canvas under the banner follows it too; the
+ * loading and error branches get the viewer's own theme.
+ */
+function ProfileScreenFrame({children}: {children: React.ReactNode}) {
   const t = useTheme()
   const {gtMobile} = useBreakpoints()
   const {top: topInset} = useSafeAreaInsets()
@@ -83,7 +97,7 @@ export function ProfileScreen(props: Props) {
     <Layout.Screen
       testID="profileScreen"
       style={[a.pt_0, userStyle('wsky-screen--profile')]}>
-      <ProfileScreenInner {...props} />
+      {children}
       {safeAreaCoverHeight > 0 && (
         <Layout.Center
           pointerEvents="none"
@@ -153,22 +167,26 @@ function ProfileScreenInner({route}: Props) {
   // pending once handle resolution has produced a DID.
   if (isDidPending || (!!resolvedDid && isProfilePending)) {
     return (
-      <Layout.Content>
-        <ProfileHeaderLoading />
-      </Layout.Content>
+      <ProfileScreenFrame>
+        <Layout.Content>
+          <ProfileHeaderLoading />
+        </Layout.Content>
+      </ProfileScreenFrame>
     )
   }
   if (resolveError || profileError) {
     return (
-      <SafeAreaView style={[a.flex_1]}>
-        <ErrorScreen
-          testID="profileErrorScreen"
-          title={profileError ? _(msg`Not Found`) : _(msg`Oops!`)}
-          message={cleanError(resolveError || profileError)}
-          onPressTryAgain={onPressTryAgain}
-          showHeader
-        />
-      </SafeAreaView>
+      <ProfileScreenFrame>
+        <SafeAreaView style={[a.flex_1]}>
+          <ErrorScreen
+            testID="profileErrorScreen"
+            title={profileError ? _(msg`Not Found`) : _(msg`Oops!`)}
+            message={cleanError(resolveError || profileError)}
+            onPressTryAgain={onPressTryAgain}
+            showHeader
+          />
+        </SafeAreaView>
+      </ProfileScreenFrame>
     )
   }
   if (profile && moderationOpts) {
@@ -183,19 +201,60 @@ function ProfileScreenInner({route}: Props) {
   }
   // should never happen
   return (
-    <SafeAreaView style={[a.flex_1]}>
-      <ErrorScreen
-        testID="profileErrorScreen"
-        title="Oops!"
-        message="Something went wrong and we're not sure what."
-        onPressTryAgain={onPressTryAgain}
-        showHeader
-      />
-    </SafeAreaView>
+    <ProfileScreenFrame>
+      <SafeAreaView style={[a.flex_1]}>
+        <ErrorScreen
+          testID="profileErrorScreen"
+          title="Oops!"
+          message="Something went wrong and we're not sure what."
+          onPressTryAgain={onPressTryAgain}
+          showHeader
+        />
+      </SafeAreaView>
+    </ProfileScreenFrame>
   )
 }
 
+/**
+ * Owns the profile theme: resolves it from the owner's decorations record and
+ * paints the whole screen with it. Kept apart from the view so the view's
+ * `useTheme()` calls read the overridden context.
+ */
 function ProfileScreenLoaded({
+  profile: profileUnshadowed,
+  isPlaceholderProfile,
+  moderationOpts,
+  hideBackButton,
+}: {
+  profile: app.bsky.actor.defs.ProfileViewDetailed
+  moderationOpts: ModerationOpts
+  hideBackButton: boolean
+  isPlaceholderProfile: boolean
+}) {
+  const moderation = useMemo(
+    () => moderateProfile(profileUnshadowed, moderationOpts),
+    [profileUnshadowed, moderationOpts],
+  )
+  const theme = useProfileTheme(
+    profileUnshadowed.did,
+    !moderation.ui('profileView').blur,
+  )
+
+  return (
+    <ProfileThemeScope theme={theme}>
+      <ProfileScreenFrame>
+        <ProfileScreenView
+          profile={profileUnshadowed}
+          moderationOpts={moderationOpts}
+          isPlaceholderProfile={isPlaceholderProfile}
+          hideBackButton={hideBackButton}
+        />
+      </ProfileScreenFrame>
+    </ProfileThemeScope>
+  )
+}
+
+function ProfileScreenView({
   profile: profileUnshadowed,
   isPlaceholderProfile,
   moderationOpts,

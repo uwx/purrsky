@@ -339,6 +339,8 @@ const schema = z.object({
   showNameOutlines: z.boolean().optional(),
   /** Ignore custom display-name colors and fonts written by other accounts. */
   disableCustomNameStyles: z.boolean().optional(),
+  /** Use the viewer's theme on profiles instead of the owner's profile theme. */
+  disableProfileThemes: z.boolean().optional(),
   replyIconIndicators: z.boolean().optional(),
   showThreadPostNumbers: z.boolean().optional(),
   sixSevenCelebration: z.boolean().optional(),
@@ -559,6 +561,7 @@ export const defaults: Schema = {
   hideDisplayNames: false,
   showNameOutlines: false,
   disableCustomNameStyles: false,
+  disableProfileThemes: false,
   replyIconIndicators: true,
   showThreadPostNumbers: true,
   sixSevenCelebration: true,

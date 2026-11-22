@@ -215,10 +215,8 @@ describe('custom paint slots', () => {
 
   it('keeps the outline for a custom paint and drops it for a lone font', () => {
     expect(
-      buildDecorationRecord(
-        {nameOutline: true},
-        {nameColor: '#123456'},
-      ).nameOutline,
+      buildDecorationRecord({nameOutline: true}, {nameColor: '#123456'})
+        .nameOutline,
     ).toBe(true)
     expect(
       buildDecorationRecord({nameOutline: true}, {nameFont: 'Inter'}),
@@ -258,7 +256,12 @@ describe('animated avatar slot', () => {
   it('drops an animation this build cannot render', () => {
     expect(
       parseDecorationSettings({
-        avatarAnimated: {$type: 'blob', ref: {$link: blob.ref.toString()}, mimeType: 'image/svg+xml', size: 10},
+        avatarAnimated: {
+          $type: 'blob',
+          ref: {$link: blob.ref.toString()},
+          mimeType: 'image/svg+xml',
+          size: 10,
+        },
       }),
     ).toEqual({})
   })
@@ -268,7 +271,68 @@ describe('animated avatar slot', () => {
       buildDecorationRecord({}, {avatarAnimated: blob}).avatarAnimated,
     ).toBe(blob)
     expect(
-      buildDecorationRecord({avatarAnimated: blob}, {avatarAnimated: undefined}),
+      buildDecorationRecord(
+        {avatarAnimated: blob},
+        {avatarAnimated: undefined},
+      ),
     ).not.toHaveProperty('avatarAnimated')
+  })
+})
+
+describe('profile theme slot', () => {
+  const uri = 'at://did:plc:owner/app.witchsky.theme.colors/3mug7d56zc42i'
+
+  it('reads a pointer and its color set', () => {
+    expect(parseDecorationSettings({profileTheme: {uri}})).toEqual({
+      profileTheme: {uri},
+    })
+    expect(
+      parseDecorationSettings({profileTheme: {uri, colorSet: ' Midnight '}}),
+    ).toEqual({profileTheme: {uri, colorSet: 'Midnight'}})
+  })
+
+  it('drops anything that is not a three-part AT URI', () => {
+    for (const value of [
+      {uri: 'https://example.com/theme'},
+      {uri: 'at://did:plc:owner'},
+      {uri: 'at://did:plc:owner/app.witchsky.theme.colors'},
+      {uri: 'at://did:plc:owner/app.witchsky.theme.colors/rkey/extra'},
+      {uri: 'at://did:plc:owner/app.witchsky.theme.colors/rkey?x=1'},
+      {uri: 'at://did:plc:owner/app.witchsky.theme.colors/'},
+      {uri: 42},
+      {},
+      'at://did:plc:owner/app.witchsky.theme.colors/rkey',
+    ]) {
+      expect(parseDecorationSettings({profileTheme: value})).toEqual({})
+    }
+  })
+
+  it('caps the color set name a record can carry', () => {
+    expect(
+      parseDecorationSettings({profileTheme: {uri, colorSet: 'x'.repeat(61)}}),
+    ).toEqual({profileTheme: {uri}})
+  })
+
+  it('writes and clears the slot, keeping other decorations', () => {
+    expect(
+      buildDecorationRecord(
+        {avatar: 'gold-ring', name: 'sunset'},
+        {profileTheme: {uri, colorSet: 'Midnight'}},
+      ),
+    ).toMatchObject({
+      avatar: 'gold-ring',
+      name: 'sunset',
+      profileTheme: {uri, colorSet: 'Midnight'},
+    })
+    expect(
+      buildDecorationRecord({profileTheme: {uri}}, {profileTheme: undefined}),
+    ).not.toHaveProperty('profileTheme')
+    // Editing decorations from the profile dialog must not drop the pointer.
+    expect(
+      buildDecorationRecord(
+        {profileTheme: {uri, colorSet: 'Midnight'}},
+        {avatar: 'gold-ring'},
+      ),
+    ).toMatchObject({profileTheme: {uri, colorSet: 'Midnight'}})
   })
 })

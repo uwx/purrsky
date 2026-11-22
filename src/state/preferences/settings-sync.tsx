@@ -96,6 +96,7 @@ export const SYNCED_PREFS_KEYS = [
   'hideDisplayNames',
   'showNameOutlines',
   'disableCustomNameStyles',
+  'disableProfileThemes',
   'replyIconIndicators',
   'showThreadPostNumbers',
   'sixSevenCelebration',

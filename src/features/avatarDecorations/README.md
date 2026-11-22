@@ -22,6 +22,7 @@ in its own PDS:
   nameColor?: string // #rrggbb, arbitrary solid name fill
   nameGradient?: {colors: string[]; hard?: boolean} // 2-3 #rrggbb stops
   nameFont?: string // Google Fonts family
+  profileTheme?: {uri: string; colorSet?: string} // app.witchsky.theme.colors pointer
 }
 ```
 
@@ -97,6 +98,21 @@ extra requests.
 A blurred avatar and a blurred display name never render decorations, since the
 decoration would reveal the moderated content's shape or name color.
 
+## Profile theme
+
+`profileTheme` points at a published `app.witchsky.theme.colors` record the
+owner picked for their profile (`screens/Theme.tsx`, "Set as profile theme").
+Only the pointer is stored, so editing the theme changes the profile without
+rewriting decorations. `features/themes/profileTheme.tsx` resolves it and wraps
+the profile screen in an alf context override, so the header, tabs, and canvas
+use the author's colors while the rest of the app keeps the viewer's theme.
+
+The pointer is validated as a three-part AT URI at a `?`/`#`-free path and must
+name the theme collection; the record itself still has to pass
+`isSupportedTheme`. A pointer at a deleted or unknown record simply paints
+nothing. A blurred (moderated) profile is never painted, since the theme would
+reveal the decoration before the content.
+
 ## Viewer preferences
 
 Two viewer-side display options (`state/preferences`) sit on top of the record:
@@ -108,6 +124,9 @@ Two viewer-side display options (`state/preferences`) sit on top of the record:
 - `disableCustomNameStyles` - ignores `nameColor`, `nameGradient`, and
   `nameFont` from other accounts. Curated presets and avatar frame/shape keep
   rendering.
+- `disableProfileThemes` - keeps `profileTheme` from painting the profile page,
+  so every profile uses the viewer's own theme. Appearance settings has the
+  toggle ("Ignore profile themes").
 
 ## Editing
 

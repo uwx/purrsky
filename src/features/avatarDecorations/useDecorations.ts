@@ -10,6 +10,7 @@ import {isRecordNotFoundError} from '#/lib/xrpc-error'
 import {useA11y} from '#/state/a11y'
 import {
   useDisableCustomNameStyles,
+  useDisableProfileThemes,
   useShowNameOutlines,
 } from '#/state/preferences'
 import {
@@ -28,11 +29,7 @@ import {
   avatarBlobStillUrl,
 } from './animatedAvatar'
 import {type DecorationFrame, resolveFrame} from './catalog'
-import {
-  type DecorationDraft,
-  draftToPatch,
-  resolveDraft,
-} from './draft'
+import {type DecorationDraft, draftToPatch, resolveDraft} from './draft'
 import {useNameFontAlias} from './nameFonts'
 import {type NameGradientSpec} from './nameGradients'
 import {nameGradientTextStyle} from './nameGradientStyle'
@@ -42,6 +39,7 @@ import {
   type DecorationSettings,
   getDecorationSettings,
   parseDecorationSettings,
+  type ProfileThemeRef,
   SETTINGS_COLLECTION,
   SETTINGS_RKEY,
 } from './records'
@@ -92,6 +90,21 @@ export function useAvatarDecoration(
 /** Active avatar shape for a DID, or undefined when the viewer default applies. */
 export function useAvatarShape(did: string | undefined) {
   return useActiveDecorations(did)?.avatarShape
+}
+
+/**
+ * The published theme `did` points their profile at, or undefined when they
+ * have none or the viewer asked to ignore profile themes. The theme itself is
+ * fetched by the caller: this only resolves the pointer.
+ */
+export function useProfileThemeRef(
+  did: string | undefined,
+  enabled = true,
+): ProfileThemeRef | undefined {
+  const active = useActiveDecorations(did)
+  const disabled = useDisableProfileThemes()
+  if (!enabled || disabled) return undefined
+  return active?.profileTheme
 }
 
 const avatarPdsQueryRoot = 'avatarPdsService'

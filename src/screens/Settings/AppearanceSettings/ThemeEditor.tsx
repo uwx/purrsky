@@ -21,6 +21,11 @@ import * as Prompt from '#/components/Prompt'
 import {Text} from '#/components/Typography'
 import {APP_NAME, IS_WEB} from '#/env'
 import {
+  useMyDecorationSettings,
+  useSetDecorations,
+} from '#/features/avatarDecorations'
+import {DecorationColorField} from '#/features/avatarDecorations/editor/DecorationColorField'
+import {
   useDeleteTheme,
   usePublishTheme,
   useThemeRecord,
@@ -35,6 +40,7 @@ import {
   getColorSets,
   isMaterialYouTheme,
   type SemanticColors,
+  THEME_COLLECTION,
   type ThemeMode,
   type ThemeRecord,
   themeRkey,
@@ -137,6 +143,8 @@ export function ThemeEditorScreen({route, navigation}: Props) {
   )
   const publish = usePublishTheme()
   const deleteTheme = useDeleteTheme()
+  const decorations = useMyDecorationSettings()
+  const setDecorations = useSetDecorations()
   const deletePrompt = Prompt.usePromptControl()
   const pairPicker = Dialog.useDialogControl()
   const isEditing = Boolean(route.params.rkey && !route.params.remix)
@@ -233,7 +241,9 @@ export function ThemeEditorScreen({route, navigation}: Props) {
         variants: (current.variants ?? []).map((variant, index) => {
           if (index !== selectedIndex - 1) return variant
           const colors = {...variant.colors}
-          if (value) colors[key] = value
+          // A color equal to the base is not an override; keeping it would
+          // leave a "Use base color" button that changes nothing.
+          if (value && value !== current.base.colors[key]) colors[key] = value
           else delete colors[key]
           return {...variant, colors}
         }),
@@ -301,6 +311,17 @@ export function ThemeEditorScreen({route, navigation}: Props) {
     setError(undefined)
     try {
       await deleteTheme.mutateAsync(route.params.rkey)
+      /*
+       * The decorations record only points at the theme, so deleting the theme
+       * would leave a dangling pointer. Clear it here rather than in the themes
+       * API, which knows nothing about decorations.
+       */
+      if (
+        decorations.profileTheme?.uri ===
+        `at://${currentAccount?.did}/${THEME_COLLECTION}/${route.params.rkey}`
+      ) {
+        await setDecorations.mutateAsync({profileTheme: undefined})
+      }
       navigation.replace('ThemeGallery', {mode: record.mode})
     } catch {
       setError(l`Could not delete theme. Please try again.`)
@@ -449,68 +470,45 @@ export function ThemeEditorScreen({route, navigation}: Props) {
               </View>
 
               <View style={[a.flex_row, a.flex_wrap, a.gap_md]}>
-                {COLOR_ROLES.map(role => (
-                  <View
-                    key={role.key}
-                    style={[a.flex_1, a.gap_xs, {minWidth: 220}]}>
+                {COLOR_ROLES.map(role => {
+                  const override =
+                    selectedIndex === 0
+                      ? undefined
+                      : record.variants?.[selectedIndex - 1]?.colors?.[role.key]
+                  return (
                     <View
-                      style={[a.flex_row, a.align_center, a.justify_between]}>
+                      key={role.key}
+                      style={[a.flex_1, a.gap_xs, {minWidth: 220}]}>
                       <View>
                         <Text style={[a.font_bold]}>{role.label}</Text>
                         <Text style={[a.text_xs, t.atoms.text_contrast_medium]}>
                           {role.help}
                         </Text>
                       </View>
-                      <View
-                        style={[
-                          a.rounded_full,
-                          a.border,
-                          {
-                            width: 28,
-                            height: 28,
-                            backgroundColor: selected.colors[role.key],
-                            borderColor: t.palette.contrast_200,
-                          },
-                          shapePreference === 'sharp' && SHARP_CORNERS,
-                        ]}
+                      <DecorationColorField
+                        label={role.label}
+                        value={
+                          selectedIndex === 0
+                            ? record.base.colors[role.key]
+                            : (override ?? record.base.colors[role.key])
+                        }
+                        onChange={value => updateColor(role.key, value)}
+                        testID={`theme-color-${role.key}`}
                       />
+                      {override && (
+                        <Button
+                          label={l`Use base color`}
+                          size="tiny"
+                          color="secondary"
+                          onPress={() => updateColor(role.key, '')}>
+                          <ButtonText>
+                            <Trans>Use base color</Trans>
+                          </ButtonText>
+                        </Button>
+                      )}
                     </View>
-                    <TextField.Input
-                      label={role.label}
-                      value={
-                        selectedIndex === 0
-                          ? record.base.colors[role.key]
-                          : (record.variants?.[selectedIndex - 1]?.colors?.[
-                              role.key
-                            ] ?? '')
-                      }
-                      placeholder={
-                        selectedIndex === 0
-                          ? undefined
-                          : `Inherited: ${record.base.colors[role.key]}`
-                      }
-                      autoCapitalize="none"
-                      autoCorrect={false}
-                      isInvalid={
-                        selectedIndex === 0
-                          ? !/^#[0-9a-f]{6}$/i.test(
-                              record.base.colors[role.key],
-                            )
-                          : Boolean(
-                              record.variants?.[selectedIndex - 1]?.colors?.[
-                                role.key
-                              ] &&
-                              !/^#[0-9a-f]{6}$/i.test(
-                                record.variants?.[selectedIndex - 1]?.colors?.[
-                                  role.key
-                                ] ?? '',
-                              ),
-                            )
-                      }
-                      onChangeText={value => updateColor(role.key, value)}
-                    />
-                  </View>
-                ))}
+                  )
+                })}
               </View>
 
               {canDelete && (

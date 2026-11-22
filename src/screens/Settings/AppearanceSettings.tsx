@@ -32,6 +32,10 @@ import {
   useShowNameOutlines,
 } from '#/state/preferences/name-outlines'
 import {
+  useDisableProfileThemes,
+  useSetDisableProfileThemes,
+} from '#/state/preferences/profile-themes'
+import {
   useRepostCarouselEnabled,
   useSetRepostCarouselEnabled,
 } from '#/state/preferences/repost-carousel-enabled'
@@ -45,6 +49,7 @@ import {type Alf, atoms as a, native, useAlf, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
 import * as Toggle from '#/components/forms/Toggle'
 import {At_Stroke2_Corner0_Rounded as AtIcon} from '#/components/icons/At'
+import {ColorPalette_Stroke2_Corner0_Rounded as ColorPaletteIcon} from '#/components/icons/ColorPalette'
 import {PageText_Stroke2_Corner0_Rounded as PageTextIcon} from '#/components/icons/Page'
 import {Repost_Stroke2_Corner3_Rounded as RepostIcon} from '#/components/icons/Repost'
 import {Shapes_Stroke2_Corner0_Rounded as CornersIcon} from '#/components/icons/Shapes'
@@ -102,6 +107,9 @@ export function AppearanceSettingsScreen({}: Props) {
 
   const disableCustomNameStyles = useDisableCustomNameStyles()
   const setDisableCustomNameStyles = useSetDisableCustomNameStyles()
+
+  const disableProfileThemes = useDisableProfileThemes()
+  const setDisableProfileThemes = useSetDisableProfileThemes()
 
   useEffect(() => {
     if (!preview) return
@@ -335,6 +343,20 @@ export function AppearanceSettingsScreen({}: Props) {
                   <SettingsList.ItemIcon icon={Aa} />
                   <SettingsList.ItemText>
                     <Trans>Ignore custom name colors and fonts</Trans>
+                  </SettingsList.ItemText>
+                  <Toggle.Platform />
+                </SettingsList.Item>
+              </Toggle.Item>
+
+              <Toggle.Item
+                name="disable_profile_themes"
+                label={l`Ignore profile themes`}
+                value={disableProfileThemes}
+                onChange={value => setDisableProfileThemes(value)}>
+                <SettingsList.Item>
+                  <SettingsList.ItemIcon icon={ColorPaletteIcon} />
+                  <SettingsList.ItemText>
+                    <Trans>Ignore profile themes</Trans>
                   </SettingsList.ItemText>
                   <Toggle.Platform />
                 </SettingsList.Item>

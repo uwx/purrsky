@@ -27,12 +27,7 @@ export {
   resolveDraft,
 } from './draft'
 export {DecorationsEditor} from './editor/DecorationsEditor'
-export {
-  fontCssUrl,
-  type FontFace,
-  fontFaceCss,
-  parseFontFaces,
-} from './fontCss'
+export {fontCssUrl, type FontFace, fontFaceCss, parseFontFaces} from './fontCss'
 export {
   getGoogleFont,
   getGoogleFonts,
@@ -58,11 +53,7 @@ export {
   type NameGradientSpec,
 } from './nameGradients'
 export {nameGradientTextStyle} from './nameGradientStyle'
-export {
-  gradientSolid,
-  type NamePaint,
-  resolveNamePaint,
-} from './namePaint'
+export {gradientSolid, type NamePaint, resolveNamePaint} from './namePaint'
 export {
   contrastRatio,
   DARK_OUTLINE,
@@ -79,6 +70,7 @@ export {
 export {
   type DecorationSettings,
   type NameGradientPaint,
+  type ProfileThemeRef,
   SETTINGS_COLLECTION,
   SETTINGS_RKEY,
 } from './records'
@@ -92,6 +84,7 @@ export {
   useMyDecorationSettingsQuery,
   useNameGradient,
   useNameStyle,
+  useProfileThemeRef,
   useSaveDecorations,
   useSetDecorations,
 } from './useDecorations'

@@ -14,6 +14,7 @@ import {type NativeStackScreenProps} from '@react-navigation/native-stack'
 import {HITSLOP_10} from '#/lib/constants'
 import {useAccountSwitcher} from '#/lib/hooks/useAccountSwitcher'
 import {useApplyPullRequestOTAUpdate} from '#/lib/hooks/useOTAUpdates'
+import {getHomeNavigationAction} from '#/lib/routes/navigation'
 import {
   type CommonNavigatorParams,
   type NavigationProp,
@@ -28,11 +29,16 @@ import {clearStorage} from '#/state/persisted'
 import {useEnableSquareButtons} from '#/state/preferences/enable-square-buttons'
 import {useHideDisplayNames} from '#/state/preferences/hide-display-names'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
+import {useAccountProfilesQuery} from '#/state/queries/account-profiles'
 import {useDeleteActorDeclaration} from '#/state/queries/messages/actor-declaration'
 import {useModerationInboxUnreadCountQuery} from '#/state/queries/moderation-inbox'
-import {useProfileQuery, useProfilesQuery} from '#/state/queries/profile'
-import {usePdsClient} from '#/state/session'
-import {type SessionAccount, useSession, useSessionApi} from '#/state/session'
+import {useProfileQuery} from '#/state/queries/profile'
+import {
+  type SessionAccount,
+  usePdsClient,
+  useSession,
+  useSessionApi,
+} from '#/state/session'
 import {
   type AccountSortOption,
   sortAccountItems,
@@ -47,7 +53,7 @@ import {AppServerHeaderControl} from '#/screens/Login/components/AppServerDialog
 import {EditProfileDialog} from '#/screens/Profile/Header/EditProfileDialog'
 import {GrowthbookDialog} from '#/screens/Settings/components/GrowthbookDialog'
 import * as SettingsList from '#/screens/Settings/components/SettingsList'
-import {atoms as a, platform, tokens, useBreakpoints, useTheme} from '#/alf'
+import {atoms as a, tokens, useBreakpoints, useTheme} from '#/alf'
 import {AgeAssuranceDismissibleNotice} from '#/components/ageAssurance/AgeAssuranceDismissibleNotice'
 import {AvatarStackWithFetch} from '#/components/AvatarStack'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
@@ -113,15 +119,8 @@ export function SettingsScreen({}: Props) {
   const ax = useAnalytics()
   const {t: l} = useLingui()
   const t = useTheme()
-  const isModerationInboxEnabled = ax.features.enabled(
-    ax.features.ModerationInboxEnable,
-  )
-  const unreadCountQuery = useModerationInboxUnreadCountQuery(
-    isModerationInboxEnabled,
-  )
-  const unreadCount = isModerationInboxEnabled
-    ? (unreadCountQuery.data?.unreadCounts.total ?? 0)
-    : 0
+  const unreadCountQuery = useModerationInboxUnreadCountQuery()
+  const unreadCount = unreadCountQuery.data?.unreadCounts.total ?? 0
   const reducedMotion = useReducedMotion()
   const scrollRef = useAnimatedRef<Animated.ScrollView>()
   const scrollOffset = useScrollViewOffset(scrollRef)
@@ -133,8 +132,8 @@ export function SettingsScreen({}: Props) {
   const editProfileControl = useDialogControl()
   const signOutPromptControl = Prompt.usePromptControl()
   const {data: profile} = useProfileQuery({did: currentAccount?.did})
-  const {data: otherProfiles} = useProfilesQuery({
-    handles: accounts
+  const {data: otherProfiles} = useAccountProfilesQuery({
+    dids: accounts
       .filter(acc => acc.did !== currentAccount?.did)
       .map(acc => acc.did),
   })
@@ -650,6 +649,7 @@ function ProfilePreview({
           a.align_center,
           a.justify_center,
           a.w_full,
+          a.pt_sm,
         ]}>
         <Text
           emoji
@@ -657,7 +657,6 @@ function ProfilePreview({
           numberOfLines={1}
           gradient={decorated ? nameGradient : undefined}
           style={[
-            a.pt_sm,
             t.atoms.text,
             gtMobile ? a.text_4xl : a.text_3xl,
             a.font_bold,
@@ -665,16 +664,7 @@ function ProfilePreview({
           ]}>
           {displayName}
         </Text>
-        <ProfileBadges
-          profile={shadow}
-          size="xl"
-          interactive
-          style={[
-            {
-              marginTop: platform({web: 8, ios: 8, android: 10}),
-            },
-          ]}
-        />
+        <ProfileBadges profile={shadow} size="xl" interactive />
       </View>
       {!hideDisplayNames && (
         <Text style={[a.text_md, a.leading_snug, t.atoms.text_contrast_medium]}>
@@ -704,7 +694,9 @@ function DevOptions() {
   const growthbookControl = useDialogControl()
 
   const resetOnboarding = () => {
-    navigation.navigate('Home')
+    navigation.dispatch(
+      getHomeNavigationAction(navigation.getState(), 'navigate'),
+    )
     onboardingDispatch({type: 'start'})
     Toast.show(l`Onboarding reset`)
   }

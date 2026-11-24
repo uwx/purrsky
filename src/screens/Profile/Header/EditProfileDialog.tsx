@@ -203,8 +203,14 @@ function DialogInner({
     mutateAsync: updateProfileMutation,
     error: updateProfileError,
     isError: isUpdateProfileError,
-    isPending: isUpdatingProfile,
   } = useProfileUpdateMutation()
+  /*
+   * Covers the whole save, not just the profile mutation: links are written
+   * first, and a second save started meanwhile would create every new link's
+   * record again. The ref catches a second press before the re-render.
+   */
+  const [isSaving, setIsSaving] = useState(false)
+  const isSavingRef = useRef(false)
   const [imageError, setImageError] = useState('')
   const witchHatControl = Dialog.useDialogControl()
   const decorationSettings = useMyDecorationSettingsQuery()
@@ -264,9 +270,9 @@ function DialogInner({
   const profileDirty =
     displayName !== initialDisplayName ||
     description !== initialDescription ||
+    pronouns !== initialPronouns ||
     userAvatar !== profile.avatar ||
     userBanner !== profile.banner ||
-    pronouns !== initialPronouns ||
     pvpMode !== initialPvpMode ||
     websiteTransferred
   const linksDirty =
@@ -319,6 +325,9 @@ function DialogInner({
   )
 
   const onPressSave = useCallback(async () => {
+    if (isSavingRef.current) return
+    isSavingRef.current = true
+    setIsSaving(true)
     setImageError('')
     try {
       if (decorationsDirty) {
@@ -366,7 +375,11 @@ function DialogInner({
         }),
       })
       if (nextLinks && written) {
-        logProfileLinkChanges(ax, storedLinks ?? [], nextLinks)
+        logProfileLinkChanges(
+          ax,
+          storedLinks ?? [],
+          nextLinks.map((link, i) => ({...link, uri: written.refs[i].uri})),
+        )
         setOwnProfileLinksCache(profile.did, nextLinks, written.refs)
         await written.deleteRemoved()
       }
@@ -382,6 +395,9 @@ function DialogInner({
       Toast.show(l({message: 'Profile updated', context: 'toast'}))
     } catch (e: any) {
       logger.error('Failed to update user profile', {message: String(e)})
+      // left set on success, so Save stays off while the dialog closes
+      isSavingRef.current = false
+      setIsSaving(false)
     }
   }, [
     updateProfileMutation,
@@ -445,7 +461,7 @@ function DialogInner({
           label={l`Add a witch hat to your avatar`}
           accessibilityHint={l`Choose an avatar photo first, then position the witch hat`}
           onPress={() => witchHatControl.open()}
-          disabled={!userAvatar || isUpdatingProfile}
+          disabled={!userAvatar || isSaving}
           size="tiny"
           color="secondary"
           style={[
@@ -466,7 +482,7 @@ function DialogInner({
         onPress={onPressSave}
         disabled={
           !dirty ||
-          isUpdatingProfile ||
+          isSaving ||
           saveDecorations.isPending ||
           displayNameTooLong ||
           descriptionTooLong
@@ -481,7 +497,7 @@ function DialogInner({
         <ButtonText style={[a.text_md, !dirty && t.atoms.text_contrast_low]}>
           <Trans>Save</Trans>
         </ButtonText>
-        {isUpdatingProfile && <ButtonIcon icon={Loader} />}
+        {isSaving && <ButtonIcon icon={Loader} />}
       </Button>
     ),
     [
@@ -489,7 +505,7 @@ function DialogInner({
       t,
       dirty,
       onPressSave,
-      isUpdatingProfile,
+      isSaving,
       saveDecorations.isPending,
       displayNameTooLong,
       descriptionTooLong,
@@ -554,13 +570,13 @@ function DialogInner({
       <View style={[a.mt_4xl, a.px_xl, a.gap_xl]}>
         <View>
           <TextField.LabelText>
-            <Trans>Display name</Trans>
+            <Trans>Name</Trans>
           </TextField.LabelText>
           <TextField.Root isInvalid={displayNameTooLong}>
             <Dialog.Input
               value={displayName}
               onChangeText={setDisplayName}
-              label={l`Display name`}
+              label={l`Name`}
               placeholder={l`e.g. Alice Lastname`}
               testID="editProfileDisplayNameInput"
             />
@@ -575,7 +591,7 @@ function DialogInner({
               ]}>
               <Plural
                 value={MAX_DISPLAY_NAME}
-                other="Display name is too long. The maximum number of characters is #."
+                other="Name is too long. The maximum number of characters is #."
               />
             </Text>
           )}
@@ -602,14 +618,14 @@ function DialogInner({
 
         <View>
           <TextField.LabelText>
-            <Trans>Description</Trans>
+            <Trans>Bio</Trans>
           </TextField.LabelText>
           <TextField.Root isInvalid={descriptionTooLong}>
             <Dialog.Input
               value={description}
               onChangeText={setDescription}
               multiline
-              label={l`Description`}
+              label={l`Bio`}
               placeholder={l`Tell us a bit about yourself`}
               testID="editProfileDescriptionInput"
             />
@@ -624,7 +640,7 @@ function DialogInner({
               ]}>
               <Plural
                 value={MAX_DESCRIPTION}
-                other="Description is too long. The maximum number of characters is #."
+                other="Bio is too long. The maximum number of characters is #."
               />
             </Text>
           )}
@@ -664,7 +680,7 @@ function DialogInner({
           label={l`PVP mode`}
           value={pvpMode}
           onChange={setPvpMode}
-          disabled={isUpdatingProfile}
+          disabled={isSaving}
           testID="editProfilePvpModeToggle"
           style={[
             a.flex_row,
@@ -751,7 +767,7 @@ function DialogInner({
               avatar={userAvatar}
               displayName={displayName.trimEnd() || profile.handle}
               handle={profile.handle}
-              disabled={isUpdatingProfile || saveDecorations.isPending}
+              disabled={isSaving || saveDecorations.isPending}
             />
           )}
         </View>
@@ -765,7 +781,9 @@ function DialogInner({
             title={l`Account`}
             description={l`Handle, email, and password`}
             onPress={() =>
-              onNavigateAway(() => void navigate('AccountSettings'))
+              onNavigateAway(() =>
+                void navigate({name: 'AccountSettings', params: undefined}),
+              )
             }
             testID="editProfileAccountSettingsLink"
           />

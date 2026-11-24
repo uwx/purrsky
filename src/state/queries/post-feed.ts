@@ -56,12 +56,14 @@ import {
   didOrHandleUriMatches,
   embedViewRecordToPostView,
   getEmbeddedPost,
+  hasReachedPageFillLimit,
   useAutoPagination,
 } from './util'
 
 type ActorDid = string
 export type AuthorFilter =
   | 'posts_with_replies'
+  | 'posts_and_replies_only'
   | 'posts_no_replies'
   | 'posts_and_author_threads'
   | 'posts_with_media'
@@ -141,9 +143,9 @@ export interface FeedPage {
 }
 
 /**
- * The minimum number of posts we want in a single "page" of results. Since we
- * filter out unwanted content, we may fetch more than this number to ensure
- * that we get _at least_ this number.
+ * The number of posts we ask for in a single "page" of results. Since we filter
+ * out unwanted content, a page can end up with fewer. If it ends up with fewer
+ * than half, `useAutoPagination` fetches another page.
  */
 const MIN_POSTS = 30
 
@@ -189,6 +191,18 @@ export function usePostFeedQuery(
     args: typeof selectArgs
     result: InfiniteData<FeedPage>
   } | null>(null)
+  /*
+   * The selector below closes over this ref, and TanStack keeps the last
+   * fetch's options (selector included) alive with the cached query after
+   * unmount. Emptying it lets the selected pages - every post's moderation
+   * decision - be collected while only the raw pages stay cached.
+   */
+  useEffect(
+    () => () => {
+      lastRun.current = null
+    },
+    [],
+  )
   const isDiscover = feedDesc.includes(DISCOVER_FEED_URI)
 
   /**
@@ -446,13 +460,32 @@ export function usePostFeedQuery(
       itemCount += slice.items.length
     }
   }
+  /**
+   * Repost-heavy profiles can leave Replies sparse even with server filtering.
+   * Keep this five-request hard stop Replies-only; other feeds can be sparse
+   * due to moderation but retain their existing pagination behavior.
+   */
+  const isPageFillLimited =
+    feedDesc.startsWith('author|') &&
+    feedDesc.endsWith('|posts_and_replies_only') &&
+    hasReachedPageFillLimit(query.data?.pages, MIN_POSTS)
+  const paginatedQuery = {
+    ...query,
+    isPageFillLimited,
+    hasNextPage: query.hasNextPage && !isPageFillLimited,
+    fetchNextPage: (...args: Parameters<typeof query.fetchNextPage>) =>
+      isPageFillLimited ? Promise.resolve(query) : query.fetchNextPage(...args),
+  }
   useAutoPagination(
-    {...query, hasNextPage: !params?.paginated && query.hasNextPage},
+    {
+      ...paginatedQuery,
+      hasNextPage: !params?.paginated && paginatedQuery.hasNextPage,
+    },
     itemCount,
     MIN_POSTS,
   )
 
-  return query
+  return paginatedQuery
 }
 
 export async function pollLatest(page: FeedPage | undefined) {
@@ -540,7 +573,7 @@ function createApi({
     const [__, uriList] = feedDesc.split('|')
     return new PostListFeedAPI({
       client,
-      feedParams: {uris: uriList.split(',') as AtUriString[]},
+      feedParams: {uris: uriList.split(',').filter(Boolean) as AtUriString[]},
     })
   } else if (feedDesc === 'seen') {
     return new SeenPostsFeedAPI({client})

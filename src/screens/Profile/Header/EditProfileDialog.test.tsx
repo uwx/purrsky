@@ -240,13 +240,19 @@ it('asks before discarding edits, then navigates', () => {
   expect(mockClose).not.toHaveBeenCalled()
   fireEvent.press(screen.getByTestId('probeConfirmDiscard'))
   expect(mockClose).toHaveBeenCalledTimes(1)
-  expect(mockNavigate).toHaveBeenCalledWith('AccountSettings')
+  expect(mockNavigate).toHaveBeenCalledWith({
+    name: 'AccountSettings',
+    params: undefined,
+  })
 })
 
 it('navigates to account settings after the dialog closes', () => {
   const screen = setup()
   fireEvent.press(screen.getByTestId('editProfileAccountSettingsLink'))
-  expect(mockNavigate).toHaveBeenCalledWith('AccountSettings')
+  expect(mockNavigate).toHaveBeenCalledWith({
+    name: 'AccountSettings',
+    params: undefined,
+  })
 })
 
 it('writes a decoration draft when the profile is saved', () => {

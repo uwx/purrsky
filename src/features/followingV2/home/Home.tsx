@@ -50,7 +50,7 @@ import {NoFeedsPinned} from '#/screens/Home/NoFeedsPinned'
 import {useBreakpoints, useTheme} from '#/alf'
 import * as Layout from '#/components/Layout'
 import {useAnalytics} from '#/analytics'
-import {IS_LIQUID_GLASS, IS_WEB} from '#/env'
+import {IS_NATIVE, IS_WEB} from '#/env'
 import {Deck} from '#/features/deck/Deck'
 import {useDemoMode} from '#/storage/hooks/demo-mode'
 import {FeedPage} from './FeedPage'
@@ -101,7 +101,7 @@ export function HomeScreen(props: Props) {
     return (
       <Layout.Screen
         testID="HomeScreen"
-        noInsetTop={IS_LIQUID_GLASS}
+        noInsetTop={IS_NATIVE}
         // The deck fills the viewport, so the centered column borders don't apply.
         fullBleed={IS_WEB && deckLayoutEnabled && gtMobile}
         style={userStyle('wsky-screen--home')}>

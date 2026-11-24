@@ -3,3 +3,8 @@
 # than the committed glyphmaps. Keep icon sources LF so the build matches.
 assets/icons/**/*.svg text eol=lf
 src/components/icons/**/*.tsx text eol=lf
+
+# `git apply` (and pnpm's patching) treat a CRLF-converted patch as garbage,
+# so keep the patch sources LF in the working tree too.
+patches/**/*.patch text eol=lf
+patches/**/*.md text eol=lf

@@ -155,3 +155,5 @@ bskyweb/static/style.css
 
 # Google Fonts metadata cache for scripts/generate-google-fonts.mjs
 scripts/.cache/
+
+.argent

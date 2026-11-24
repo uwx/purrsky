@@ -101,6 +101,22 @@ export function getFeatureDescription(feature: Features, i18n: I18n) {
           }),
         ),
       }
+    case Features.PostViewCountsEnable:
+      return {
+        key: feature,
+        name: i18n._(
+          msg({
+            message: 'Post view counts',
+            comment: 'Name for a feature flag',
+          }),
+        ),
+        description: i18n._(
+          msg({
+            message: 'See how often your posts were seen.',
+            comment: 'Description of a feature flag (Post view counts)',
+          }),
+        ),
+      }
     case Features.WebListVirtualizationEnable:
       // Only the web List is affected; native lists are already virtualized
       if (!env.IS_WEB) return null
@@ -118,40 +134,6 @@ export function getFeatureDescription(feature: Features, i18n: I18n) {
               'Feeds and lists keep only nearby posts in the page, so performance stays steady however far you scroll.',
             comment:
               'Description of a feature flag (Feed rendering improvements)',
-          }),
-        ),
-      }
-    case Features.NotificationsV2Enable:
-      return {
-        key: feature,
-        name: i18n._(
-          msg({
-            message: 'Redesigned notifications',
-            comment: 'Name for a feature flag',
-          }),
-        ),
-        description: i18n._(
-          msg({
-            message:
-              'Notifications sorted into tabs – people you follow, followers, replies and activity.',
-            comment: 'Description of a feature flag (Redesigned notifications)',
-          }),
-        ),
-      }
-    case Features.ModerationInboxEnable:
-      return {
-        key: feature,
-        name: i18n._(
-          msg({
-            message: 'Moderation inbox',
-            comment: 'Name for a feature flag',
-          }),
-        ),
-        description: i18n._(
-          msg({
-            message:
-              'Track your reports, review moderation decisions, and submit appeals.',
-            comment: 'Description of a feature flag (Moderation inbox)',
           }),
         ),
       }

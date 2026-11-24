@@ -58,7 +58,8 @@ export type ListProps<ItemT = any> = Omit<
   refreshing?: boolean
   onRefresh?: () => void
   onItemNearViewport?: (item: ItemT) => void
-  onItemSeen?: (item: ItemT) => void
+  /** The index may be unavailable for native viewability tokens. */
+  onItemSeen?: (item: ItemT, index: number | undefined) => void
   desktopFixedHeight?: number | boolean
   // Web only prop to contain the scroll to the container rather than the window
   disableFullWindowScroll?: boolean
@@ -69,10 +70,10 @@ export type ListProps<ItemT = any> = Omit<
 }
 export type ListRef = React.RefObject<ListMethods | null>
 
-const ON_ITEM_SEEN_WAIT_DURATION = 0.5e3 // when we consider post to  be "seen"
+const ON_ITEM_SEEN_WAIT_DURATION = 0.5e3 // when we consider post to be "seen"
 const ON_ITEM_SEEN_INTERSECTION_OPTS = {
-  rootMargin: '-200px 0px -200px 0px',
-} // post must be 200px visible to be "seen"
+  rootMargin: '0px 0px -200px 0px',
+}
 const ON_ITEM_NEAR_VIEWPORT_INTERSECTION_OPTS = {
   rootMargin: '800px 0px 800px 0px',
 }
@@ -118,6 +119,7 @@ function ListImpl<ItemT>(
   const contextScrollHandlers = useScrollHandlers()
   const {isWithinSplitView} = useIsWithinSplitView()
   const t = useTheme()
+  const ax = useAnalytics()
 
   // automatically disable full window scroll when within split view
   const disableFullWindowScroll =
@@ -767,7 +769,7 @@ let Row = function RowImpl<ItemT>({
     null | undefined | ((info: ListRenderItemInfo<ItemT>) => React.ReactNode)
   extraData: unknown
   onItemNearViewport: ((item: ItemT) => void) | undefined
-  onItemSeen: ((item: ItemT) => void) | undefined
+  onItemSeen: ListProps<ItemT>['onItemSeen']
   registerRowNode: (index: number, node: HTMLElement | null) => void
   observeRow: ((key: string, node: HTMLElement | null) => void) | undefined
 }): React.ReactNode {
@@ -802,7 +804,7 @@ let Row = function RowImpl<ItemT>({
             if (!intersectionTimeout.current) {
               intersectionTimeout.current = setTimeout(() => {
                 intersectionTimeout.current = undefined
-                onItemSeen(item)
+                onItemSeen(item, index)
               }, ON_ITEM_SEEN_WAIT_DURATION)
             }
           } else {
@@ -825,8 +827,11 @@ let Row = function RowImpl<ItemT>({
     return () => {
       // The row may unmount mid-wait now that rows leave the virtualized window.
       unobserve?.()
-      clearTimeout(intersectionTimeout.current)
-      intersectionTimeout.current = undefined
+      // Rows can unmount while the seen timer is pending, e.g. when virtualized.
+      if (intersectionTimeout.current) {
+        clearTimeout(intersectionTimeout.current)
+        intersectionTimeout.current = undefined
+      }
     }
   }, [handleIntersection, onItemSeen])
 
@@ -874,7 +879,7 @@ Row = memo(Row) as <ItemT>(props: {
     null | undefined | ((info: ListRenderItemInfo<ItemT>) => React.ReactNode)
   extraData: unknown
   onItemNearViewport: ((item: ItemT) => void) | undefined
-  onItemSeen: ((item: ItemT) => void) | undefined
+  onItemSeen: ListProps<ItemT>['onItemSeen']
   registerRowNode: (index: number, node: HTMLElement | null) => void
   observeRow: ((key: string, node: HTMLElement | null) => void) | undefined
 }) => React.ReactNode

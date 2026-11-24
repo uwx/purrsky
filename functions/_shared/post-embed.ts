@@ -59,6 +59,7 @@ type Thread = {
     embed?: Embed
     indexedAt: string
     record?: {facets?: Facet[]; text?: string}
+    uri?: string
   }
 }
 
@@ -390,6 +391,14 @@ export function renderHeadMeta({
 
   const embedElems = renderEmbedMeta(media)
 
+  const uri = thread.post.uri
+  const atUri = uri
+    ? html`
+        <link rel="alternate" href="${uri}" />
+        <meta name="at:canonical" content="${uri}" />
+      `
+    : ''
+
   return html`
     <meta property="og:site_name" content="${appName}" />
     <meta property="og:type" content="article" />
@@ -400,6 +409,7 @@ export function renderHeadMeta({
     <meta name="twitter:label1" content="Account DID" />
     <meta name="twitter:value1" content="${author.did}" />
     <meta name="article:published_time" content="${thread.post.indexedAt}" />
+    ${atUri}
   `
 }
 

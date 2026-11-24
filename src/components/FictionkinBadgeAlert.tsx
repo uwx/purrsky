@@ -96,7 +96,10 @@ export function FictionkinBadgeAlert({
               label={l`Open settings`}
               onPress={() => {
                 control.close(() => {
-                  void navigate('FictionkinBadgeSettings')
+                  void navigate({
+                    name: 'FictionkinBadgeSettings',
+                    params: undefined,
+                  })
                 })
               }}
               color="secondary"

@@ -13,6 +13,7 @@ import {useOpenComposer} from '#/lib/hooks/useOpenComposer'
 import {useRequireEmailVerification} from '#/lib/hooks/useRequireEmailVerification'
 import {useRichText} from '#/lib/hooks/useRichText'
 import {useSetTitle} from '#/lib/hooks/useSetTitle'
+import {getProfileTabIndex} from '#/lib/routes/profile-tabs'
 import {
   type CommonNavigatorParams,
   type NativeStackScreenProps,
@@ -150,7 +151,7 @@ function ProfileScreenInner({route}: Props) {
     if (resolveError) {
       if (name === 'lulaoficial.bsky.social') {
         console.log('Applying redirect to lula.com.br')
-        void navigate('Profile', {name: 'lula.com.br'})
+        void navigate({name: 'Profile', params: {name: 'lula.com.br'}})
       }
     }
   }, [name, resolveError])
@@ -192,10 +193,16 @@ function ProfileScreenInner({route}: Props) {
   if (profile && moderationOpts) {
     return (
       <ProfileScreenLoaded
+        key={
+          route.params.tab !== undefined
+            ? `${profile.did}-${route.params.tab}-${isPlaceholderProfile}`
+            : profile.did
+        }
         profile={profile}
         moderationOpts={moderationOpts}
         isPlaceholderProfile={isPlaceholderProfile}
         hideBackButton={!!route.params.hideBackButton}
+        tab={route.params.tab}
       />
     )
   }
@@ -225,11 +232,13 @@ function ProfileScreenLoaded({
   isPlaceholderProfile,
   moderationOpts,
   hideBackButton,
+  tab,
 }: {
   profile: app.bsky.actor.defs.ProfileViewDetailed
   moderationOpts: ModerationOpts
   hideBackButton: boolean
   isPlaceholderProfile: boolean
+  tab?: string
 }) {
   const moderation = useMemo(
     () => moderateProfile(profileUnshadowed, moderationOpts),
@@ -248,6 +257,7 @@ function ProfileScreenLoaded({
           moderationOpts={moderationOpts}
           isPlaceholderProfile={isPlaceholderProfile}
           hideBackButton={hideBackButton}
+          tab={tab}
         />
       </ProfileScreenFrame>
     </ProfileThemeScope>
@@ -259,11 +269,13 @@ function ProfileScreenView({
   isPlaceholderProfile,
   moderationOpts,
   hideBackButton,
+  tab,
 }: {
   profile: app.bsky.actor.defs.ProfileViewDetailed
   moderationOpts: ModerationOpts
   hideBackButton: boolean
   isPlaceholderProfile: boolean
+  tab?: string
 }) {
   /*
    * A block lives on `viewer`, so a viewer-less profile is a plain profile.
@@ -315,7 +327,6 @@ function ProfileScreenView({
     did: profile.did,
     enabled: !!profile.associated?.labeler,
   })
-  const [currentPage, setCurrentPage] = useState(0)
   const [isRefreshing, setIsRefreshing] = useState(false)
   const {_} = useLingui()
   const showStandardLabelerProfile = useShowStandardLabelerProfile()
@@ -349,7 +360,8 @@ function ProfileScreenView({
   const hasLabeler = !!profile.associated?.labeler
   const showFiltersTab = hasLabeler
   const showPostsTab = true
-  const showRepliesTab = hasSession
+  // Reply deep links must work without a session so crawlers can index reply-heavy profiles.
+  const showRepliesTab = hasSession || tab === 'replies'
   const showMediaTab = !hasLabeler || showStandardLabelerProfile
   const showVideosTab = !hasLabeler || showStandardLabelerProfile
   const showLikesTab = isMe
@@ -371,7 +383,9 @@ function ProfileScreenView({
     : profile.handle
   // subtract starterpack count from list count, since starterpacks are a type of list
   const listCount = (profile.associated?.lists || 0) - starterPackCount
-  const showListsTab = hasSession && (isMe || listCount > 0)
+  // Lists are public, so direct links can bypass the logged-in-only tab visibility.
+  const showListsTab =
+    (hasSession || tab === 'lists') && (isMe || listCount > 0)
 
   const useLabelerTabOrder = hasLabeler && !showStandardLabelerProfile
   const sectionTitles = [
@@ -404,6 +418,9 @@ function ProfileScreenView({
   if (showFiltersTab) {
     filtersIndex = nextIndex++
   }
+  if (showListsTab && useLabelerTabOrder) {
+    listsIndex = nextIndex++
+  }
   if (showPostsTab) {
     postsIndex = nextIndex++
   }
@@ -431,9 +448,24 @@ function ProfileScreenView({
   if (showPacksTab) {
     packsIndex = nextIndex++
   }
-  if (showListsTab) {
+  if (showListsTab && !useLabelerTabOrder) {
     listsIndex = nextIndex++
   }
+
+  const initialPage = getProfileTabIndex(
+    tab,
+    {
+      posts: postsIndex,
+      replies: repliesIndex,
+      media: mediaIndex,
+      videos: videosIndex,
+      feeds: feedsIndex,
+      'starter-packs': starterPacksIndex,
+      lists: listsIndex,
+    },
+    0,
+  )
+  const [currentPage, setCurrentPage] = useState(initialPage)
 
   const scrollSectionToTop = useCallback(
     (index: number) => {
@@ -558,6 +590,7 @@ function ProfileScreenView({
       modui={moderation.ui('profileView')}>
       <PagerWithHeader
         testID="profilePager"
+        initialPage={initialPage}
         /* Bio mentions resolve in the background without delaying posts or tabs. */
         isHeaderReady={!isPlaceholderProfile}
         items={sectionTitles}
@@ -624,7 +657,7 @@ function ProfileScreenView({
           ? ({headerHeight, isFocused, scrollElRef}) => (
               <ProfileFeedSection
                 ref={repliesSectionRef}
-                feed={`author|${profile.did}|posts_with_replies`}
+                feed={`author|${profile.did}|posts_and_replies_only`}
                 headerHeight={headerHeight}
                 isFocused={isFocused}
                 scrollElRef={scrollElRef as ListRef}

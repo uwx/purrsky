@@ -30,7 +30,6 @@ const WORDMARK_SCALE = WORDMARK_HEIGHT / WORDMARK_CAP_HEIGHT
 const MARK_WIDTH = MARK_INK.width * MARK_SCALE
 const LOCKUP_WIDTH =
   MARK_WIDTH + WORDMARK_GAP + WORDMARK_INK_WIDTH * WORDMARK_SCALE
-const LOCKUP_RATIO = LOCKUP_HEIGHT / LOCKUP_WIDTH
 
 const MARK_TRANSFORM = [
   `translate(${(-MARK_INK.x * MARK_SCALE).toFixed(3)}`,
@@ -54,8 +53,11 @@ export function Full(
     textFill?: Props['fill']
   },
 ) {
-  const {fill, size, style, gradient, ...rest} = useCommonSVGProps(props)
-  const height = size * LOCKUP_RATIO
+  const {fill, width, height, viewBox, style, gradient, ...rest} =
+    useCommonSVGProps(
+      props,
+      `0 0 ${LOCKUP_WIDTH.toFixed(2)} ${LOCKUP_HEIGHT}`,
+    )
 
   if (APP_NAME !== DRAWN_NAME) {
     const capHeight = (height * WORDMARK_HEIGHT) / LOCKUP_HEIGHT
@@ -87,8 +89,8 @@ export function Full(
     <Svg
       fill="none"
       {...rest}
-      viewBox={`0 0 ${LOCKUP_WIDTH.toFixed(2)} ${LOCKUP_HEIGHT}`}
-      width={size}
+      viewBox={viewBox}
+      width={width}
       height={height}
       style={[style]}>
       {gradient}

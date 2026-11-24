@@ -18,7 +18,6 @@ import {
   type Shadow,
   usePostShadow,
 } from '#/state/cache/post-shadow'
-import {useFeedFeedbackContext} from '#/state/feed-feedback'
 import {useCompactPosts} from '#/state/preferences/compact-posts'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {useSeeThroughBlocks} from '#/state/preferences/see-through-blocks'
@@ -31,10 +30,6 @@ import {
 } from '#/state/queries/see-through-blocks'
 import {useSession} from '#/state/session'
 import {useMergedThreadgateHiddenReplies} from '#/state/threadgate-hidden-replies'
-import {
-  buildPostSourceKey,
-  setUnstablePostSource,
-} from '#/state/unstable-post-source'
 import {Link} from '#/view/com/util/Link'
 import {PostMeta} from '#/view/com/util/PostMeta'
 import {PreviewableUserAvatar} from '#/view/com/util/UserAvatar'
@@ -69,6 +64,13 @@ import {SubtleHover} from '#/components/SubtleHover'
 import {Text} from '#/components/Typography'
 import {Features, useAnalytics} from '#/analytics'
 import {IS_NATIVE, IS_WEB} from '#/env'
+import {
+  type FeedItem,
+  FeedItemProvider,
+  repostVia,
+  useFeedFeedbackContext,
+} from '#/features/feedFeedback'
+import {stashPostSource} from '#/features/feedFeedback/postSource'
 import {useActorStatus} from '#/features/liveNow'
 import {PostPoll} from '#/features/pollblue/components/PostPoll'
 import {pollPostParts} from '#/features/pollblue/parse'
@@ -172,31 +174,40 @@ export function PostFeedItem({
       ? moderatePost(anonPost, moderationOpts)
       : moderation
   if (richText && moderation) {
+    const feedItem: FeedItem = {
+      uri: postShadowed.uri,
+      authorDid: postShadowed.author.did,
+      feedContext,
+      reqId,
+      via: repostVia(reason),
+    }
     return (
       <ReportDialogMetadataContext.Provider key={postShadowed.uri}>
-        <FeedItemInner
-          post={postShadowed}
-          record={displayRecord}
-          seeThrough={Boolean(anonPost)}
-          seeThroughCauses={anonPost ? blockCauses(moderation) : undefined}
-          postNumbering={postNumbering}
-          reason={reason}
-          feedContext={feedContext}
-          reqId={reqId}
-          richText={richText}
-          parentAuthor={parentAuthor}
-          showReplyTo={showReplyTo}
-          moderation={displayModeration}
-          isThreadChild={isThreadChild}
-          isThreadLastChild={isThreadLastChild}
-          isThreadParent={isThreadParent}
-          hideTopBorder={hideTopBorder}
-          isParentBlocked={isParentBlocked}
-          isParentNotFound={isParentNotFound}
-          isCarouselItem={isCarouselItem}
-          rootPost={rootPost}
-          onShowLess={onShowLess}
-        />
+        <FeedItemProvider value={feedItem}>
+          <FeedItemInner
+            post={postShadowed}
+            record={displayRecord}
+            seeThrough={Boolean(anonPost)}
+            seeThroughCauses={anonPost ? blockCauses(moderation) : undefined}
+            postNumbering={postNumbering}
+            reason={reason}
+            feedContext={feedContext}
+            reqId={reqId}
+            richText={richText}
+            parentAuthor={parentAuthor}
+            showReplyTo={showReplyTo}
+            moderation={displayModeration}
+            isThreadChild={isThreadChild}
+            isThreadLastChild={isThreadLastChild}
+            isThreadParent={isThreadParent}
+            hideTopBorder={hideTopBorder}
+            isParentBlocked={isParentBlocked}
+            isParentNotFound={isParentNotFound}
+            isCarouselItem={isCarouselItem}
+            rootPost={rootPost}
+            onShowLess={onShowLess}
+          />
+        </FeedItemProvider>
       </ReportDialogMetadataContext.Provider>
     )
   }
@@ -326,7 +337,7 @@ let FeedItemInner = ({
       feedDescriptor,
     })
     unstableCacheProfileView(queryClient, post.author)
-    setUnstablePostSource(buildPostSourceKey(post.uri, post.author.handle), {
+    stashPostSource({
       feedSourceInfo,
       post: {
         post,
@@ -370,19 +381,6 @@ let FeedItemInner = ({
     : undefined
 
   const {isActive: live} = useActorStatus(post.author)
-
-  const viaRepost = useMemo(() => {
-    if (
-      bsky.isType(app.bsky.feed.defs.reasonRepost, reason) &&
-      reason.uri &&
-      reason.cid
-    ) {
-      return {
-        uri: reason.uri,
-        cid: reason.cid,
-      }
-    }
-  }, [reason])
 
   const threadgateHiddenReplies = useMergedThreadgateHiddenReplies({
     threadgateRecord,
@@ -567,11 +565,8 @@ let FeedItemInner = ({
             richText={richText}
             onPressReply={onPressReply}
             logContext="FeedItem"
-            feedContext={feedContext}
-            reqId={reqId}
             threadgateRecord={threadgateRecord}
             onShowLess={onShowLess}
-            viaRepost={viaRepost}
           />
           <KnownLikers
             post={post}

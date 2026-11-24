@@ -7,7 +7,7 @@ import {type Client} from '@atproto/lex'
 import {nanoid} from 'nanoid/non-secure'
 
 import {uploadBlob} from '#/lib/api'
-import {safeDeleteAsync} from '#/lib/media/manip'
+import {safeDelete} from '#/lib/media/manip'
 
 /**
  * Copies a blob from another PDS into the signed-in account by downloading it
@@ -34,6 +34,6 @@ export async function copyBlobToOwnRepo(
     const encoding = mimeType ?? result.mimeType ?? 'application/octet-stream'
     return (await uploadBlob(client, target, encoding)).blob
   } finally {
-    await safeDeleteAsync(target)
+    safeDelete(target)
   }
 }

@@ -6,6 +6,10 @@ jest.mock('#/features/events/components/EventEmbed', () => ({
   EventEmbed: () => null,
 }))
 jest.mock('#/Navigation', () => ({}))
+jest.mock('#/lib/hooks/useIntentHandler', () => ({
+  useGroupChatJoinIntent: () => () => false,
+}))
+jest.mock('#/components/PeekMenu', () => ({}))
 jest.mock('#/state/session', () => ({}))
 jest.mock('#/state/queries/profile', () => ({}))
 jest.mock('#/lib/haptics', () => ({}))
@@ -22,7 +26,7 @@ jest.mock('#/state/queries/direct-fetch-record', () => ({
 }))
 jest.mock('#/alf', () => ({
   atoms: jest.requireActual<typeof import('@bsky.app/alf')>('@bsky.app/alf').atoms,
-  platform: (value: unknown) => value,
+  platform: (values: {default?: unknown}) => values.default,
   tokens: jest.requireActual<typeof import('#/alf/tokens')>('#/alf/tokens'),
   useScheme: () => 'light',
   useTheme: () => ({}),

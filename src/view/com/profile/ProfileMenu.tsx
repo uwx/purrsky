@@ -924,7 +924,6 @@ let ProfileMenu = ({
         profile={profile}
         onBlock={blockAccount}
       />
-
       <FollowConfirmationDialog
         control={followPromptControl}
         displayName={sanitizeDisplayName(profile.displayName || profile.handle)}
@@ -932,7 +931,6 @@ let ProfileMenu = ({
         actionType={confirmationAction}
         onConfirm={onConfirmFollowAction}
       />
-
       <Prompt.Basic
         control={loggedOutWarningPromptControl}
         title={l`Note about sharing`}

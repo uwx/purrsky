@@ -6,7 +6,6 @@ import {useNavigation} from '@react-navigation/native'
 import {useCleanError} from '#/lib/hooks/useCleanError'
 import {type NavigationProp} from '#/lib/routes/types'
 import {type Shadow} from '#/state/cache/post-shadow'
-import {useFeedFeedbackContext} from '#/state/feed-feedback'
 import {useBookmarkMutation} from '#/state/queries/bookmarks/useBookmarkMutation'
 import {useRequireAuth, useSession} from '#/state/session'
 import {EventStopper} from '#/view/com/util/EventStopper'
@@ -25,6 +24,8 @@ import * as Menu from '#/components/Menu'
 import {useMenuControl} from '#/components/Menu'
 import * as toast from '#/components/Toast'
 import {useAnalytics} from '#/analytics'
+import {type BookmarkEntryPoint} from '#/analytics/metrics/types'
+import {useFeedItemFeedback} from '#/features/feedFeedback'
 import {useBookmarkListMutation} from '#/features/tokimeki/bookmarkListMutations'
 import {
   useTokimekiBookmarkListsQuery,
@@ -51,7 +52,11 @@ export const BookmarkButton = memo(function BookmarkButton({
   const {t: l} = useLingui()
   const {hasSession} = useSession()
   const requireAuth = useRequireAuth()
-  const {isBookmarked} = usePostBookmark({post, logContext})
+  const {isBookmarked} = usePostBookmark({
+    post,
+    logContext,
+    entryPoint: 'BookmarkButton',
+  })
   const menuControl = useMenuControl()
   const [hasBeenOpen, setHasBeenOpen] = useState(false)
   const lazyMenuControl = useMemo(
@@ -123,7 +128,11 @@ function BookmarkMenu({
 }) {
   const {t: l} = useLingui()
   const navigation = useNavigation<NavigationProp>()
-  const {isBookmarked, toggleBookmark} = usePostBookmark({post, logContext})
+  const {isBookmarked, toggleBookmark} = usePostBookmark({
+    post,
+    logContext,
+    entryPoint: 'BookmarkButton',
+  })
   const {isPending, variables, mutate} = useBookmarkListMutation()
   const {
     data: listsData,
@@ -225,20 +234,24 @@ function BookmarkMenu({
 
 /**
  * Saves a post to the viewer's saved posts, or removes it, with the bookmark
- * button's metrics and toasts. Removing offers an undo.
+ * button's metrics and toasts. Removing offers an undo. Inside a feed item,
+ * saves and unsaves are also sent to the feed as feed feedback.
  */
 export function usePostBookmark({
   post,
   logContext,
+  entryPoint,
 }: {
   post: Shadow<app.bsky.feed.defs.PostView>
   logContext: 'FeedItem' | 'PostThreadItem' | 'Post' | 'ImmersiveVideo'
+  /** Which control is saving, for metrics. */
+  entryPoint: BookmarkEntryPoint
 }) {
   const ax = useAnalytics()
   const {t: l} = useLingui()
   const {mutateAsync: bookmark} = useBookmarkMutation()
   const cleanError = useCleanError()
-  const {feedDescriptor} = useFeedFeedbackContext()
+  const {feedDescriptor, sendUnspecced} = useFeedItemFeedback()
 
   const isBookmarked = !!post.viewer?.bookmarked
 
@@ -258,8 +271,10 @@ export function usePostBookmark({
         uri: post.uri,
         authorDid: post.author.did,
         logContext,
+        entryPoint,
         feedDescriptor,
       })
+      sendUnspecced({type: 'save'})
       return true
     } catch (e: any) {
       const {raw, clean} = cleanError(e)
@@ -281,8 +296,10 @@ export function usePostBookmark({
         uri: post.uri,
         authorDid: post.author.did,
         logContext,
+        entryPoint,
         feedDescriptor,
       })
+      sendUnspecced({type: 'unsave'})
 
       toast.show(
         <toast.Outer>

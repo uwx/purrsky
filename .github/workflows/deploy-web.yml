@@ -1,7 +1,4 @@
 name: Deploy web
-      # react-native-executorch's postinstall downloads Android/iOS native libs
-      # that only native builds link. No web step compiles them.
-      RNET_SKIP_DOWNLOAD: '1'
 
 on:
   push:
@@ -29,6 +26,9 @@ jobs:
       EXPO_PUBLIC_BUNDLE_IDENTIFIER: ${{ github.sha }}
       EXPO_PUBLIC_BUNDLE_DATE: ${{ github.run_id }}
       NODE_OPTIONS: --max-old-space-size=8192
+      # react-native-executorch's postinstall downloads Android/iOS native libs
+      # that only native builds link. No web step compiles them.
+      RNET_SKIP_DOWNLOAD: '1'
       CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
       CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
     steps:

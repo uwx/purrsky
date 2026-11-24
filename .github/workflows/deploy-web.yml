@@ -1,4 +1,7 @@
 name: Deploy web
+      # react-native-executorch's postinstall downloads Android/iOS native libs
+      # that only native builds link. No web step compiles them.
+      RNET_SKIP_DOWNLOAD: '1'
 
 on:
   push:

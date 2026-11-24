@@ -414,6 +414,8 @@ const schema = z.object({
   openAiCompatibleApiKey: z.string().optional(),
   openAiCompatibleBaseUrl: z.string().optional(),
   openAiCompatibleModel: z.string().optional(),
+  /** Offer on-device alt text generation in the composer. */
+  localAltTextEnabled: z.boolean().optional(),
 
   useHandleInLinks: z.boolean().optional(),
 
@@ -605,6 +607,11 @@ export const defaults: Schema = {
   openAiCompatibleApiKey: undefined,
   openAiCompatibleBaseUrl: undefined,
   openAiCompatibleModel: undefined,
+  /**
+   * Unset means "follow the hosted provider": on when none is configured.
+   * Resolved in `#/state/preferences/local-alt-text`.
+   */
+  localAltTextEnabled: undefined,
 
   useHandleInLinks: false,
 

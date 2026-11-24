@@ -7,6 +7,10 @@ import {DEFAULT_ALT_TEXT_AI_PROMPT} from '#/lib/constants'
 import {usePalette} from '#/lib/hooks/usePalette'
 import {type CommonNavigatorParams} from '#/lib/routes/types'
 import {
+  useLocalAltTextEnabled,
+  useSetLocalAltTextEnabled,
+} from '#/state/preferences/local-alt-text'
+import {
   type AltTextAiProvider,
   useAltTextAiApiKey,
   useAltTextAiBaseUrl,
@@ -25,6 +29,7 @@ import {atoms as a} from '#/alf'
 import {Admonition} from '#/components/Admonition'
 import {Button, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
+import * as Toggle from '#/components/forms/Toggle'
 import * as Layout from '#/components/Layout'
 import {InlineLinkText} from '#/components/Link'
 import * as Select from '#/components/Select'
@@ -45,6 +50,8 @@ export function AltTextAiSettingsScreen({}: Props) {
   const modelControl = Dialog.useDialogControl()
   const promptControl = Dialog.useDialogControl()
   const baseUrlControl = Dialog.useDialogControl()
+  const localAltTextEnabled = useLocalAltTextEnabled()
+  const setLocalAltTextEnabled = useSetLocalAltTextEnabled()
   const providerItems = [
     {value: 'none', label: l`None`},
     {value: 'openrouter', label: l`OpenRouter`},
@@ -97,7 +104,10 @@ export function AltTextAiSettingsScreen({}: Props) {
           {provider === 'none' ? (
             <SettingsList.Item>
               <Admonition type="info" style={[a.flex_1]}>
-                <Trans>Automatic alt text generation is turned off.</Trans>
+                <Trans>
+                  No hosted provider is selected. Alt text can still be
+                  generated on this device.
+                </Trans>
               </Admonition>
             </SettingsList.Item>
           ) : (
@@ -186,6 +196,42 @@ export function AltTextAiSettingsScreen({}: Props) {
                 />
               </SettingsList.Item>
             </>
+          )}
+
+          <SettingsList.Divider />
+
+          <Toggle.Item
+            name="local_alt_text"
+            label={l`Generate alt text on this device`}
+            value={localAltTextEnabled}
+            onChange={setLocalAltTextEnabled}>
+            <SettingsList.Item>
+              <SettingsList.ItemText>
+                <Trans>Generate alt text on this device</Trans>
+              </SettingsList.ItemText>
+              <Toggle.Platform />
+            </SettingsList.Item>
+          </Toggle.Item>
+
+          {localAltTextEnabled && (
+            <SettingsList.Item>
+              <Admonition type="info" style={[a.flex_1]}>
+                {IS_WEB ? (
+                  <Trans>
+                    Images stay in your browser and are never uploaded. The
+                    first use downloads about 320 MB of model weights, which the
+                    browser keeps for later posts. Runs on WebGPU when
+                    available, otherwise WebAssembly.
+                  </Trans>
+                ) : (
+                  <Trans>
+                    Images stay on your device and are never uploaded. The first
+                    use downloads about 650 MB of model weights, which stay on
+                    the device. Expect it to be slower than a hosted model.
+                  </Trans>
+                )}
+              </Admonition>
+            </SettingsList.Item>
           )}
 
           {provider !== 'none' && (

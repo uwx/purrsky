@@ -41,6 +41,8 @@ const IMAGE_GAP = 8
 interface GalleryProps {
   images: ComposerImage[]
   dispatch: (action: PostAction) => void
+  /** Post languages, in preference order. Used for on-device alt text. */
+  languages: string[]
 }
 
 export let Gallery = (props: GalleryProps): React.ReactNode => {
@@ -68,7 +70,12 @@ interface GalleryInnerProps extends GalleryProps {
   containerInfo: Dimensions
 }
 
-const GalleryInner = ({images, containerInfo, dispatch}: GalleryInnerProps) => {
+const GalleryInner = ({
+  images,
+  containerInfo,
+  dispatch,
+  languages,
+}: GalleryInnerProps) => {
   const {isMobile} = useWebMediaQueries()
 
   const {altTextControlStyle, imageControlsStyle, imageStyle} = useMemo(() => {
@@ -114,6 +121,7 @@ const GalleryInner = ({images, containerInfo, dispatch}: GalleryInnerProps) => {
             <GalleryItem
               key={image.source.id}
               image={image}
+              languages={languages}
               altTextControlStyle={altTextControlStyle}
               imageControlsStyle={imageControlsStyle}
               imageStyle={imageStyle}
@@ -141,6 +149,7 @@ const GalleryInner = ({images, containerInfo, dispatch}: GalleryInnerProps) => {
 
 type GalleryItemProps = {
   image: ComposerImage
+  languages: string[]
   altTextControlStyle?: ViewStyle
   imageControlsStyle?: ViewStyle
   imageStyle?: ImageStyle
@@ -150,6 +159,7 @@ type GalleryItemProps = {
 
 const GalleryItem = ({
   image,
+  languages,
   altTextControlStyle,
   imageControlsStyle,
   imageStyle,
@@ -277,6 +287,7 @@ const GalleryItem = ({
       <ImageAltTextDialog
         control={altTextControl}
         image={image}
+        languages={languages}
         onChange={onChange}
         sourceViewTag={altBtnViewTag}
       />

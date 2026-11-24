@@ -48,6 +48,7 @@ import {Provider as KawaiiProvider} from './kawaii'
 import {Provider as LanguagesProvider} from './languages'
 import {Provider as LargeAltBadgeProvider} from './large-alt-badge'
 import {Provider as LoadSmallPNGsProvider} from './load-small-pngs'
+import {Provider as LocalAltTextProvider} from './local-alt-text'
 import {MetricsDisplayPreferencesProvider} from './metrics-display-preference'
 import {Provider as NameOutlinesProvider} from './name-outlines'
 import {Provider as NoDiscoverProvider} from './no-discover-fallback'
@@ -141,6 +142,10 @@ export {
 export {useImageCdnHost, useSetImageCdnHost} from './image-cdn-host'
 export {useLabelDefinitions} from './label-defs'
 export {useLanguagePrefs, useLanguagePrefsApi} from './languages'
+export {
+  useLocalAltTextEnabled,
+  useSetLocalAltTextEnabled,
+} from './local-alt-text'
 export {useSetShowNameOutlines, useShowNameOutlines} from './name-outlines'
 export {useOmitViaField, useSetOmitViaField} from './omit-via-field'
 export {
@@ -292,9 +297,11 @@ export function Provider({children}: PropsWithChildren<{}>) {
                                                                                                                                                                           <NameOutlinesProvider>
                                                                                                                                                                             <CustomNameStylesProvider>
                                                                                                                                                                               <ProfileThemesProvider>
-                                                                                                                                                                                {
-                                                                                                                                                                                  children
-                                                                                                                                                                                }
+                                                                                                                                                                                <LocalAltTextProvider>
+                                                                                                                                                                                  {
+                                                                                                                                                                                    children
+                                                                                                                                                                                  }
+                                                                                                                                                                                </LocalAltTextProvider>
                                                                                                                                                                               </ProfileThemesProvider>
                                                                                                                                                                             </CustomNameStylesProvider>
                                                                                                                                                                           </NameOutlinesProvider>

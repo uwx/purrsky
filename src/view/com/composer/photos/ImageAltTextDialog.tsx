@@ -9,11 +9,14 @@ import {useLingui} from '@lingui/react'
 import {Plural, Trans} from '@lingui/react/macro'
 
 import {generateAltText} from '#/lib/ai/generateAltText'
+import {generateLocalAltText} from '#/lib/ai/local-alt-text/localAltText'
+import {type LocalAltTextProgress} from '#/lib/ai/local-alt-text/shared'
 import {MAX_ALT_TEXT} from '#/lib/constants'
 import {getShapeRadius, getShapeStyle} from '#/lib/shapes'
 import {enforceLen} from '#/lib/strings/helpers'
 import {type ComposerImage} from '#/state/gallery'
 import {useEnableSquareButtons} from '#/state/preferences/enable-square-buttons'
+import {useLocalAltTextEnabled} from '#/state/preferences/local-alt-text'
 import {
   useAltTextAiConfig,
   useAltTextAiConfigured,
@@ -32,6 +35,8 @@ import {IS_WEB} from '#/env'
 type Props = {
   control: Dialog.DialogOuterProps['control']
   image: ComposerImage
+  /** Post languages, in preference order. On-device generation writes in the first. */
+  languages: string[]
   onChange: (next: ComposerImage) => void
   sourceViewTag?: number
 }
@@ -39,6 +44,7 @@ type Props = {
 export const ImageAltTextDialog = ({
   control,
   image,
+  languages,
   onChange,
   sourceViewTag,
 }: Props): React.ReactNode => {
@@ -66,6 +72,7 @@ export const ImageAltTextDialog = ({
       <ImageAltTextInner
         control={control}
         image={image}
+        languages={languages}
         onChangeText={text => {
           editedAltText.current = text
         }}
@@ -78,10 +85,12 @@ const ImageAltTextInner = ({
   onChangeText,
   control,
   image,
+  languages,
 }: {
   onChangeText: (text: string) => void
   control: DialogControlProps
   image: Props['image']
+  languages: string[]
 }): React.ReactNode => {
   const [altText, setAltText] = useState(image.alt)
   const {_, i18n} = useLingui()
@@ -89,9 +98,14 @@ const ImageAltTextInner = ({
   const shape = useEnableSquareButtons()
   const [isGenerating, setIsGenerating] = useState(false)
   const [generateError, setGenerateError] = useState<string | null>(null)
+  const [localProgress, setLocalProgress] =
+    useState<LocalAltTextProgress | null>(null)
+  const [localError, setLocalError] = useState<string | null>(null)
 
   const aiConfigured = useAltTextAiConfigured()
   const aiConfig = useAltTextAiConfig()
+  const localEnabled = useLocalAltTextEnabled()
+  const isGeneratingLocal = localProgress !== null
 
   const source = image.transformed ?? image.source
   const imageStyle: ImageStyle = {
@@ -146,6 +160,52 @@ const ImageAltTextInner = ({
       setIsGenerating(false)
     }
   }, [aiConfig, image, setAltText, onChangeText])
+
+  const handleGenerateLocalAltText = useCallback(async () => {
+    setLocalError(null)
+    setLocalProgress({stage: 'load'})
+
+    try {
+      const text = await generateLocalAltText({
+        uri: source.path,
+        width: source.width,
+        height: source.height,
+        languages,
+        onProgress: setLocalProgress,
+      })
+
+      setAltText(text)
+      onChangeText(text)
+    } catch (err) {
+      setLocalError(
+        err instanceof Error ? err.message : 'Failed to generate alt text',
+      )
+    } finally {
+      setLocalProgress(null)
+    }
+    // The dialog is torn down while generation may still be running; the
+    // setState calls above are harmless once it is.
+  }, [
+    source.path,
+    source.width,
+    source.height,
+    languages,
+    setAltText,
+    onChangeText,
+  ])
+
+  let statusText: string | null = null
+  if (localProgress?.stage === 'download') {
+    statusText = _(
+      msg`Downloading model… ${i18n.number(
+        Math.round((localProgress.progress ?? 0) * 100),
+      )}%`,
+    )
+  } else if (localProgress?.stage === 'load') {
+    statusText = _(msg`Loading model…`)
+  } else if (localProgress) {
+    statusText = _(msg`Generating alt text…`)
+  }
 
   return (
     <Dialog.ScrollableInner label={_(msg`Add alt text`)}>
@@ -236,7 +296,7 @@ const ImageAltTextInner = ({
             color="secondary"
             variant="solid"
             onPress={() => void handleGenerateAltText()}
-            disabled={isGenerating}
+            disabled={isGenerating || isGeneratingLocal}
             style={[a.flex_grow]}>
             {isGenerating ? (
               <ActivityIndicator color={t.palette.primary_500} />
@@ -247,6 +307,41 @@ const ImageAltTextInner = ({
               <Trans>Generate alt text</Trans>
             </ButtonText>
           </Button>
+        )}
+
+        {localEnabled && (
+          <Button
+            label={_(msg`Generate alt text on this device`)}
+            size="large"
+            color="secondary"
+            variant="solid"
+            onPress={() => void handleGenerateLocalAltText()}
+            disabled={isGenerating || isGeneratingLocal}
+            style={[a.flex_grow]}>
+            {isGeneratingLocal ? (
+              <ActivityIndicator color={t.palette.primary_500} />
+            ) : (
+              <SparkleIcon size="sm" />
+            )}
+            <ButtonText>
+              <Trans>Generate on this device</Trans>
+            </ButtonText>
+          </Button>
+        )}
+
+        {statusText && (
+          <Text style={[a.text_sm, t.atoms.text_contrast_medium]}>
+            {statusText}
+          </Text>
+        )}
+
+        {localError && (
+          <View style={[a.pb_sm, a.flex_row, a.gap_xs]}>
+            <CircleInfo fill={t.palette.negative_500} />
+            <Text style={[a.flex_1, t.atoms.text_contrast_medium]}>
+              {localError}
+            </Text>
+          </View>
         )}
 
         <AltTextCounterWrapper altText={altText}>

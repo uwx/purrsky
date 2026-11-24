@@ -44,6 +44,23 @@ Apple touch icon was checked in iOS 26.5 Default, Dark, Clear, and Tinted modes.
 
 Updates the extensions in `/modules` with the current iOS/Android project changes.
 
+## build-local-alt-text.mjs
+_(Witchsky-specific)_
+
+Run `pnpm alt-text:build` after changing
+`src/lib/ai/local-alt-text/localAltText.worker.ts` or the
+`@huggingface/transformers` version. It bundles the on-device alt text worker
+into `public/static/local-alt-text/worker.js`, which is checked in because the
+model only runs in a browser and the worker needs a URL of its own.
+
+Metro cannot do this: `@huggingface/transformers` ships ESM that Metro will not
+bundle, and nothing in the app imports the worker, so it is built separately with
+esbuild. esbuild is not a dependency; the copy that ships with the Expo toolchain
+is used. The script fails if the output would still import anything at runtime.
+
+The model weights and the ONNX Runtime wasm binaries are downloaded from the
+Hugging Face and jsDelivr CDNs on first use, not served from our origin.
+
 ## patch-package-to-pnpm.mjs
 _(Witchsky-specific)_
 

@@ -1956,6 +1956,7 @@ export const ComposePost = ({
               <ComposerPost
                 post={post}
                 dispatch={composerDispatch}
+                languages={currentLanguages}
                 textInputRef={post.id === activePost.id ? textInputRef : null}
                 isFirstPost={index === 0}
                 isLastPost={index === thread.posts.length - 1}
@@ -2047,6 +2048,7 @@ function ComposerLayout({children}: {children: React.ReactNode}) {
 let ComposerPost = memo(function ComposerPost({
   post,
   dispatch,
+  languages,
   textInputRef,
   isActive,
   isReply,
@@ -2069,6 +2071,7 @@ let ComposerPost = memo(function ComposerPost({
 }: {
   post: PostDraft
   dispatch: (action: ComposerAction) => void
+  languages: string[]
   textInputRef: React.RefObject<TextInputRef | null> | null
   isActive: boolean
   isReply: boolean
@@ -2362,6 +2365,7 @@ let ComposerPost = memo(function ComposerPost({
         dispatch={dispatchPost}
         clearVideo={() => onClearVideo(post.id)}
         isActivePost={isActive}
+        languages={languages}
       />
     </View>
   )
@@ -2659,18 +2663,24 @@ function ComposerEmbeds({
   clearVideo,
   canRemoveQuote,
   isActivePost,
+  languages,
 }: {
   embed: EmbedDraft
   dispatch: (action: PostAction) => void
   clearVideo: () => void
   canRemoveQuote: boolean
   isActivePost: boolean
+  languages: string[]
 }) {
   const video = embed.media?.type === 'video' ? embed.media.video : null
   return (
     <>
       {(embed.media?.type === 'images' || embed.media?.type === 'gallery') && (
-        <Gallery images={embed.media.images} dispatch={dispatch} />
+        <Gallery
+          images={embed.media.images}
+          dispatch={dispatch}
+          languages={languages}
+        />
       )}
 
       {embed.media?.type === 'game' && (

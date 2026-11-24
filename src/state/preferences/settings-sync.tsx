@@ -127,6 +127,7 @@ export const SYNCED_PREFS_KEYS = [
   'openAiCompatibleApiKey',
   'openAiCompatibleBaseUrl',
   'openAiCompatibleModel',
+  'localAltTextEnabled',
   'useHandleInLinks',
   'trendingTopicCount',
   'trendingDisabled',

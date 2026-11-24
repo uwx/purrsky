@@ -537,13 +537,24 @@ function CustomNameSwatch({
               borderColor: t.atoms.border_contrast_low.borderColor,
             },
       ]}>
-      <LinearGradient
-        colors={colors as [string, string, ...string[]]}
-        locations={locations}
-        start={{x: 0, y: 0}}
-        end={{x: 1, y: 0}}
-        style={[a.absolute, a.inset_0]}
-      />
+      {/*
+       * A solid name paint has one stop. Android's LinearGradient rejects
+       * fewer than two colors, so paint it flat instead.
+       */}
+      {colors.length < 2 ? (
+        <View
+          testID="decoration-gradient-custom-fill"
+          style={[a.absolute, a.inset_0, {backgroundColor: colors[0]}]}
+        />
+      ) : (
+        <LinearGradient
+          colors={colors as [string, string, ...string[]]}
+          locations={locations}
+          start={{x: 0, y: 0}}
+          end={{x: 1, y: 0}}
+          style={[a.absolute, a.inset_0]}
+        />
+      )}
       <View style={[a.flex_1, a.align_center, a.justify_center, a.px_sm]}>
         <View
           style={[

@@ -167,7 +167,18 @@ jest.mock('expo-linear-gradient', () => {
   const {createElement: h} = react
   const {View} = rn
   return {
-    LinearGradient: (props: Record<string, unknown>) => h(View, props),
+    /*
+     * Android's android.graphics.LinearGradient throws on fewer than two
+     * colors ("needs >= 2 number of colors"), so the mock does too: a swatch
+     * that hands it a single stop must fail here rather than on a device.
+     */
+    LinearGradient: (props: Record<string, unknown>) => {
+      const colors = props.colors as string[]
+      if (colors.length < 2) {
+        throw new Error('needs >= 2 number of colors')
+      }
+      return h(View, props)
+    },
   }
 })
 /*

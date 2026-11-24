@@ -4,8 +4,11 @@ import {useDeferredEnable} from '#/lib/hooks/useDeferredEnable'
 import {STALE} from '#/state/queries'
 import {createQueryKey} from '#/state/queries/util'
 import {usePdsClient, useSession} from '#/state/session'
-import {type BluemojiItem} from '#/features/bluemoji/util'
-import {blue, com} from '#/lexicons'
+import {
+  type BluemojiItem,
+  parseBluemojiItemRecord,
+} from '#/features/bluemoji/util'
+import {com} from '#/lexicons'
 
 export const OWN_COLLECTION_ROOT = 'useOwnCollectionQuery'
 
@@ -42,7 +45,7 @@ export function useOwnCollectionQuery({
           cursor,
         })
         for (const record of page.records) {
-          const value = blue.moji.collection.item.$ifMatches(record.value)
+          const value = parseBluemojiItemRecord(record.value)
           // An item without a CID has no addressable rendition.
           if (!value || !record.cid) continue
           items.push({

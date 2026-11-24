@@ -49,7 +49,6 @@ import {Tile, TileGrid} from '#/features/bluemoji/Picker'
 import {getLicenseUrl, getSafeSourceUrl} from '#/features/bluemoji/provenance'
 import {
   type BluemojiItem,
-  getBluemojiImage,
   getBluemojiModeration,
 } from '#/features/bluemoji/util'
 
@@ -376,7 +375,6 @@ export function EmojiPackScreen({route, navigation}: Props) {
               <Dialog.ScrollableInner label={l`Emoji details`}>
                 <BluemojiDetails
                   item={details}
-                  uri={getBluemojiImage(details) ?? ''}
                   alt={details.record.alt || details.record.name}
                 />
                 <Dialog.Close />

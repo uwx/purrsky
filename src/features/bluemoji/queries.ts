@@ -13,12 +13,19 @@ import {
   useBluemojiInstance,
 } from '#/state/preferences/bluemoji-instance'
 import {STALE} from '#/state/queries'
-import {resolvePdsServiceUrl} from '#/state/queries/resolve-identity'
+import {
+  findService,
+  resolvePdsServiceUrl,
+  useDidDocument,
+} from '#/state/queries/resolve-identity'
 import {createQueryKey} from '#/state/queries/util'
 import {
   type BluemojiItem,
   type BluemojiRef,
+  getBluemojiBlobUrl,
+  getBluemojiLottieCid,
   getBluemojiRefUri,
+  parseBluemojiItemRecord,
 } from '#/features/bluemoji/util'
 import {blue, com} from '#/lexicons'
 
@@ -46,7 +53,7 @@ export async function fetchBluemojiItem(
       rkey: atUri.rkey,
       cid,
     })
-    const record = blue.moji.collection.item.$ifMatches(result.value)
+    const record = parseBluemojiItemRecord(result.value)
     if (
       !record ||
       result.uri !== uri ||
@@ -92,6 +99,22 @@ export function useBluemojiItemQuery(ref: BluemojiRef) {
     ...bluemojiItemQueryOptions(ref),
     enabled,
   })
+}
+
+/**
+ * The blob URL of an item's animated rendition.
+ *
+ * `com.atproto.sync.getBlob` only answers on the PDS that stores the blob:
+ * moji.blue's CDN indexes images, so a Lottie document is not there at all.
+ */
+export function useBluemojiLottieUrl(item: BluemojiItem | undefined) {
+  const cid = item ? getBluemojiLottieCid(item) : undefined
+  const {data: doc} = useDidDocument({did: cid && item ? item.did : ''})
+  if (!item || !cid) return
+  const pds =
+    doc && findService(doc, '#atproto_pds', 'AtprotoPersonalDataServer')
+  if (!pds?.serviceEndpoint) return
+  return getBluemojiBlobUrl(item.did, cid, pds.serviceEndpoint)
 }
 
 export function useBluemojiSearchQuery({

@@ -662,6 +662,12 @@ importers:
       lodash.throttle:
         specifier: ^4.1.1
         version: 4.1.1
+      lottie-react-native:
+        specifier: ~7.5.1
+        version: 7.5.1(react-native@0.88.1(patch_hash=a8ef86b4b0ceba7d75310f539958e4a36f5c5c0fc8d8fe9ec9546547c61dc221)(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.0)(supports-color@10.2.2))(react@19.3.0)
+      lottie-web:
+        specifier: ^5.13.0
+        version: 5.13.0
       mediabunny:
         specifier: ^1.25.3
         version: 1.49.0
@@ -8333,6 +8339,22 @@ packages:
   loose-envify@1.4.0:
     resolution: {integrity: sha512-lyuxPGr/Wfhrlem2CL/UcnUc1zcqKAImBDzukY7Y5F/yQiNdko6+fRLevlw1HgMySw7f611UIY408EtxRSoK3Q==}
     hasBin: true
+
+  lottie-react-native@7.5.1:
+    resolution: {integrity: sha512-HNEk3HvDRPLmBqMdZEvnvmUTXI0dAt82Ot+0BUPRTrYYw9TuAAZ4Xb4VinwjBOSuHXA2cpEZxJXENZ1VVa0RGQ==}
+    peerDependencies:
+      '@lottiefiles/dotlottie-react': ^0.13.5
+      react: '>=19.2'
+      react-native: '>=0.84'
+      react-native-windows: '>=0.63.x'
+    peerDependenciesMeta:
+      '@lottiefiles/dotlottie-react':
+        optional: true
+      react-native-windows:
+        optional: true
+
+  lottie-web@5.13.0:
+    resolution: {integrity: sha512-+gfBXl6sxXMPe8tKQm7qzLnUy5DUPJPKIyRHwtpCpyUEYjHYRJC/5gjUvdkuO2c3JllrPtHXH5UJJK8LRYl5yQ==}
 
   lru-cache@10.4.3:
     resolution: {integrity: sha512-JNAzZcXrCt42VGLuYz0zfAzDfAvJWW6AfYlDBQyDV5DClI2m5sAmK+OIO7s59XfsRsWHp02jAJrRadPRGTt6SQ==}
@@ -19270,6 +19292,13 @@ snapshots:
   loose-envify@1.4.0:
     dependencies:
       js-tokens: 4.0.0
+
+  lottie-react-native@7.5.1(react-native@0.88.1(patch_hash=a8ef86b4b0ceba7d75310f539958e4a36f5c5c0fc8d8fe9ec9546547c61dc221)(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.0)(supports-color@10.2.2))(react@19.3.0):
+    dependencies:
+      react: 19.3.0
+      react-native: 0.88.1(patch_hash=a8ef86b4b0ceba7d75310f539958e4a36f5c5c0fc8d8fe9ec9546547c61dc221)(@babel/core@7.29.7(supports-color@10.2.2))(@react-native/metro-config@0.88.1(@babel/core@7.29.7(supports-color@10.2.2))(supports-color@10.2.2))(@types/react@19.3.0)(react@19.3.0)(supports-color@10.2.2)
+
+  lottie-web@5.13.0: {}
 
   lru-cache@10.4.3: {}
 

@@ -57,6 +57,26 @@ export function getBluemojiImage(item: BluemojiItem, instance?: string) {
 }
 
 /**
+ * The animated rendition is a Blob-typed Lottie JSON, not an image, so it has
+ * no CDN URL. It is the only rendition some items have.
+ */
+export function getBluemojiLottieCid(item: BluemojiItem) {
+  return blobCid((item.record.formats as Record<string, unknown>).lottie)
+}
+
+/** Whether the record has a rendition the app knows how to draw. */
+export function isBluemojiRenderable(item: BluemojiItem) {
+  return Boolean(getBluemojiRendition(item) || getBluemojiLottieCid(item))
+}
+
+export function getBluemojiBlobUrl(did: string, cid: string, pdsUrl: string) {
+  const url = new URL('/xrpc/com.atproto.sync.getBlob', pdsUrl)
+  url.searchParams.set('did', did)
+  url.searchParams.set('cid', cid)
+  return url.toString()
+}
+
+/**
  * A rendition URL that skips moji.blue's CDN.
  *
  * Its `/img` proxy only serves blobs it has indexed (or the viewer's own, for a
@@ -67,10 +87,7 @@ export function getBluemojiImage(item: BluemojiItem, instance?: string) {
 export function getBluemojiPdsImage(item: BluemojiItem, pdsUrl: string) {
   const rendition = getBluemojiRendition(item)
   if (!rendition) return
-  const url = new URL('/xrpc/com.atproto.sync.getBlob', pdsUrl)
-  url.searchParams.set('did', item.did)
-  url.searchParams.set('cid', rendition.cid)
-  return url.toString()
+  return getBluemojiBlobUrl(item.did, rendition.cid, pdsUrl)
 }
 
 function getBluemojiRendition(item: BluemojiItem, instance?: string) {
@@ -150,6 +167,29 @@ export function getBluemojiFacet(value: unknown) {
   return {...facet, record}
 }
 
+/**
+ * Validate an item record, retrying without `formats.original` when the lexicon
+ * rejects it.
+ *
+ * `original` is provenance, never drawn: the rendition slots are. Some clients
+ * store the animated document there as `application/json`, which the lexicon's
+ * accept list (`image/*`, `application/lottie+zip`) does not cover, and one
+ * rejected blob fails the whole record - which hid animated emoji whose
+ * `lottie` slot was perfectly valid.
+ */
+export function parseBluemojiItemRecord(value: unknown) {
+  const parsed = blue.moji.collection.item.$ifMatches(value)
+  if (parsed || !value || typeof value !== 'object' || !('formats' in value)) {
+    return parsed
+  }
+  const formats = value.formats
+  if (!formats || typeof formats !== 'object' || !('original' in formats)) {
+    return parsed
+  }
+  const {original: _original, ...rest} = formats
+  return blue.moji.collection.item.$ifMatches({...value, formats: rest})
+}
+
 /** Write only CID-based v1 facets, including for readable historical items. */
 export function createBluemojiFacet(
   item: BluemojiItem,
@@ -159,7 +199,13 @@ export function createBluemojiFacet(
   const formats: $Typed<blue.moji.richtext.facet.FormatsV1> = {
     $type: 'blue.moji.richtext.facet#formats_v1',
   }
-  for (const slot of ['png_128', 'webp_128', 'gif_128', 'apng_128'] as const) {
+  for (const slot of [
+    'png_128',
+    'webp_128',
+    'gif_128',
+    'apng_128',
+    'lottie',
+  ] as const) {
     const blob = (item.record.formats as Record<string, unknown>)[slot]
     const cid = blobCid(blob)
     if (cid) formats[slot] = cid
@@ -220,7 +266,7 @@ export function addBluemojiFacets(
   const facets = [...(rt.facets ?? [])]
   for (const match of matches) {
     const item = items.get(match[0])
-    if (!item || !getBluemojiImage(item)) continue
+    if (!item || !isBluemojiRenderable(item)) continue
     if (
       facets.some(
         f =>

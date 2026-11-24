@@ -276,6 +276,8 @@
     "lodash.debounce": "^4.0.8",
     "lodash.shuffle": "^4.2.0",
     "lodash.throttle": "^4.1.1",
+    "lottie-react-native": "~7.5.1",
+    "lottie-web": "^5.13.0",
     "mediabunny": "^1.25.3",
     "multiformats": "^13.4.2",
     "nanoid": "^5.0.5",

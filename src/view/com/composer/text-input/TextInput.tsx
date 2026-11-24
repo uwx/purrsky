@@ -43,7 +43,10 @@ import {
   rawToNative,
 } from '#/features/bluemoji/nativeEditor'
 import {useComposerBluemojiItems} from '#/features/bluemoji/useComposerItems'
-import {getBluemojiImage, getBluemojiModeration} from '#/features/bluemoji/util'
+import {
+  getBluemojiModeration,
+  isBluemojiRenderable,
+} from '#/features/bluemoji/util'
 import {app} from '#/lexicons'
 import * as bsky from '#/types/bsky'
 import {Autocomplete} from './mobile/Autocomplete'
@@ -84,7 +87,7 @@ export function TextInput({
   const verifiedItems = new Map(
     [...items].filter(
       ([, item]) =>
-        getBluemojiImage(item) &&
+        isBluemojiRenderable(item) &&
         getBluemojiModeration(item, moderationOpts) === 'ignore',
     ),
   )

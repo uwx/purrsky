@@ -7,6 +7,8 @@ export const imageCid =
   'bafkreiass37k5huajyfh6lzq6tndfhbsr6epvhoxz5diu4lj4rujcl3l4u'
 export const recordCid =
   'bafyreic7dsmtdn2goztns32qoj57frm5dzw2mz3mgbmqf72pskh5rhoj2q'
+export const lottieCid =
+  'bafkreig23z6zpa5qfoni3ynal2ygvxoxooepwucbbv4a3wslsq26rambsa'
 export const item: BluemojiItem = {
   did: 'did:plc:4prkargawaafljpw576fztej',
   uri: 'at://did:plc:4prkargawaafljpw576fztej/blue.moji.collection.item/blobcat',
@@ -23,6 +25,31 @@ export const item: BluemojiItem = {
         ref: CID.parse(imageCid),
         size: 2820,
         mimeType: 'image/webp',
+      },
+    },
+  },
+}
+
+/**
+ * The common shape of an animated Bluemoji: a Lottie document and nothing
+ * else, so there is no picture to draw and no CDN URL to fall back on.
+ */
+export const animatedItem: BluemojiItem = {
+  did: 'did:web:vessel.darkworld.download',
+  uri: 'at://did:web:vessel.darkworld.download/blue.moji.collection.item/telemoji_1f51e',
+  cid: recordCid,
+  record: {
+    $type: 'blue.moji.collection.item',
+    name: ':telemoji_1f51e:',
+    alt: 'A waving hand',
+    createdAt: toDatetimeString(new Date('2026-08-18T14:01:04.774Z')),
+    formats: {
+      $type: 'blue.moji.collection.item#formats_v1',
+      lottie: {
+        $type: 'blob',
+        ref: CID.parse(lottieCid),
+        size: 51553,
+        mimeType: 'application/json',
       },
     },
   },

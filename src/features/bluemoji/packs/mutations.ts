@@ -19,7 +19,10 @@ import * as Toast from '#/components/Toast'
 import {aliasToRkey, normalizeAlias} from '#/features/bluemoji/alias'
 import {OWN_COLLECTION_ROOT} from '#/features/bluemoji/collection/queries'
 import {getSafeSourceUrl} from '#/features/bluemoji/provenance'
-import {type BluemojiItem} from '#/features/bluemoji/util'
+import {
+  type BluemojiItem,
+  parseBluemojiItemRecord,
+} from '#/features/bluemoji/util'
 import {blue, com} from '#/lexicons'
 import {copyBlobToOwnRepo} from './copy-blob'
 import {PACK_ITEMS_ROOT, PACK_ROOT, PACKS_ROOT} from './queries'
@@ -336,7 +339,7 @@ async function fetchOwnAliases(pds: Client) {
       cursor,
     })
     for (const record of page.records) {
-      const value = blue.moji.collection.item.$ifMatches(record.value)
+      const value = parseBluemojiItemRecord(record.value)
       if (!value) continue
       try {
         aliases.add(normalizeAlias(value.name))

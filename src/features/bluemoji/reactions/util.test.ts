@@ -1,7 +1,4 @@
-import {
-  getLicenseUrl,
-  getSafeSourceUrl,
-} from '#/features/bluemoji/provenance'
+import {getLicenseUrl, getSafeSourceUrl} from '#/features/bluemoji/provenance'
 import {
   getReactionEmojiImage,
   toReactionEmoji,
@@ -91,5 +88,47 @@ describe('refs built from a verified item', () => {
     expect(getReactionEmojiImage(ref)).toBe(
       'https://moji.blue/img/did%3Aplc%3Aowner/bafypng',
     )
+  })
+})
+
+describe('animated reactions', () => {
+  const lottieCid =
+    'bafkreig23z6zpa5qfoni3ynal2ygvxoxooepwucbbv4a3wslsq26rambsa'
+
+  it('has no CDN image, so the owner PDS has to serve the document', () => {
+    expect(
+      getReactionEmojiImage({
+        ...emoji,
+        formats: {
+          $type: 'blue.moji.collection.item#formats_v1',
+          lottie: {$link: lottieCid},
+        },
+      } as unknown as typeof emoji),
+    ).toBeUndefined()
+  })
+
+  it('is carried into the reaction ref the app writes', () => {
+    const ref = toReactionEmoji({
+      uri: 'at://did:plc:owner/blue.moji.collection.item/telemoji_1f51e',
+      cid: 'bafyreicid',
+      did: 'did:plc:owner',
+      record: {
+        $type: 'blue.moji.collection.item',
+        name: ':telemoji_1f51e:',
+        createdAt: '2026-01-01T00:00:00.000Z',
+        formats: {
+          $type: 'blue.moji.collection.item#formats_v1',
+          lottie: {
+            ref: {$link: lottieCid},
+            size: 51553,
+            mimeType: 'application/json',
+          },
+        } as never,
+      },
+    })
+    expect(ref.formats).toEqual({
+      $type: 'blue.moji.richtext.facet#formats_v1',
+      lottie: lottieCid,
+    })
   })
 })

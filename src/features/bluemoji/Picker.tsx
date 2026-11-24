@@ -26,8 +26,8 @@ import {ReactionEmoji} from '#/features/bluemoji/reactions/ReactionEmoji'
 import {reactionEmojiToItem} from '#/features/bluemoji/reactions/util'
 import {
   type BluemojiItem,
-  getBluemojiImage,
   getBluemojiModeration,
+  isBluemojiRenderable,
 } from '#/features/bluemoji/util'
 import {type blue} from '#/lexicons'
 
@@ -248,7 +248,7 @@ function SearchTile({
    */
   const usable =
     verified &&
-    getBluemojiImage(verified) &&
+    isBluemojiRenderable(verified) &&
     getBluemojiModeration(verified, moderationOpts) !== 'hide'
 
   if (!usable) {

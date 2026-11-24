@@ -125,6 +125,27 @@ name and source description. Native details use a bottom sheet and are enabled
 only on the focused post; feed and reply-row emoji remain ordinary inline images. Hidden, warned, missing, or unsupported emoji remain
 readable as aliases. Animation follows the autoplay preference.
 
+Animated emoji often carry only a `lottie` rendition - the record has no raster
+slot at all - so `BluemojiLottie` draws the document itself. moji.blue's CDN
+indexes pictures and returns nothing for these blobs, so the player reads them
+from the owning PDS through `com.atproto.sync.getBlob`, the same DID-document
+lookup used for the PDS image fallback. Because that endpoint sends no cache
+headers, fetched documents are cached in memory per URL (bounded, and evicted on
+failure so a retry can succeed), and each mount parses its own copy since
+lottie-web mutates the animation data it is given.
+
+Web uses `lottie-web`'s light canvas player, lazily imported so it is not in the
+initial bundle; canvas rather than SVG keeps hundreds of inline emoji cheap.
+Native uses `lottie-react-native`. Playback starts after the first frame is
+ready and follows the autoplay preference; a document that fails to load falls
+back to the alias, as does one whose owning PDS cannot be resolved.
+
+Some records cannot pass strict lexicon validation at all: moji.blue's own
+client writes the Lottie document to `formats.original` as
+`application/json`, which `formats_v1.original` does not accept, and one bad
+blob rejects the whole record. `parseBluemojiItemRecord` retries without that
+provenance slot, which is never drawn, and every read path uses it.
+
 Canonical references derive record keys using NFC normalization and RFC 0005
 punycode. Historical collections with unrelated record keys carry an optional
 strong reference extension on the facet. Posting writes CID-based v1 formats;

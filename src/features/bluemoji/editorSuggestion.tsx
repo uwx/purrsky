@@ -16,8 +16,8 @@ import {isBluemojiSuggestionAllowed} from '#/features/bluemoji/editor'
 import {fetchBluemojiSuggestions} from '#/features/bluemoji/queries'
 import {
   type BluemojiItem,
-  getBluemojiImage,
   getBluemojiModeration,
+  isBluemojiRenderable,
 } from '#/features/bluemoji/util'
 
 export type EmojiSuggestion = SuggestionProps
@@ -99,7 +99,7 @@ export function ComposerEmojiAutocomplete({
   )
     .filter(
       item =>
-        getBluemojiImage(item) &&
+        isBluemojiRenderable(item) &&
         getBluemojiModeration(item, moderationOpts) === 'ignore',
     )
     .map(item => ({

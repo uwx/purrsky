@@ -1,16 +1,26 @@
 import {type ModerationOpts} from '@bsky/sdk/moderation'
 import {RichText} from '@bsky/sdk/richtext'
+import {CID} from 'multiformats/cid'
 
 import {applyFacetSyntax} from '#/lib/strings/rich-text-manip'
-import {imageCid, item} from '#/features/bluemoji/__tests__/fixtures'
+import {
+  animatedItem,
+  imageCid,
+  item,
+  lottieCid,
+} from '#/features/bluemoji/__tests__/fixtures'
 import {
   createBluemojiFacet,
   detectBluemojiFacets,
+  getBluemojiBlobUrl,
   getBluemojiFacet,
   getBluemojiImage,
   getBluemojiInsertionName,
+  getBluemojiLottieCid,
   getBluemojiModeration,
   getBluemojiRefUri,
+  isBluemojiRenderable,
+  parseBluemojiItemRecord,
 } from '#/features/bluemoji/util'
 import {app, blue} from '#/lexicons'
 
@@ -201,3 +211,77 @@ it.each(['\\<:blobcat:>', '\\[:blobcat:](https://example.com)', '\\:blobcat:'])(
     expect(rt.text).toBe(text.slice(1))
   },
 )
+
+it('treats an animation as a rendition when the item has no picture', () => {
+  expect(getBluemojiLottieCid(animatedItem)).toBe(lottieCid)
+  expect(getBluemojiLottieCid(item)).toBeUndefined()
+  expect(isBluemojiRenderable(animatedItem)).toBe(true)
+  expect(isBluemojiRenderable(item)).toBe(true)
+  expect(
+    isBluemojiRenderable({
+      ...animatedItem,
+      record: {
+        ...animatedItem.record,
+        formats: {$type: 'blue.moji.collection.item#formats_v1'},
+      },
+    }),
+  ).toBe(false)
+  /* The CDN has no raster for it, so callers must not expect a picture URL. */
+  expect(getBluemojiImage(animatedItem)).toBeUndefined()
+  expect(createBluemojiFacet(animatedItem).formats).toEqual({
+    $type: 'blue.moji.richtext.facet#formats_v1',
+    lottie: lottieCid,
+  })
+})
+
+it('addresses blobs on the PDS that stores them', () => {
+  expect(
+    getBluemojiBlobUrl(animatedItem.did, lottieCid, 'https://pds.example'),
+  ).toBe(
+    `https://pds.example/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(animatedItem.did)}&cid=${lottieCid}`,
+  )
+  /* A trailing slash on the PDS must not double up in the path. */
+  expect(
+    getBluemojiBlobUrl(animatedItem.did, lottieCid, 'https://pds.example/'),
+  ).toBe(
+    `https://pds.example/xrpc/com.atproto.sync.getBlob?did=${encodeURIComponent(animatedItem.did)}&cid=${lottieCid}`,
+  )
+})
+
+it('reads an item whose original slot is the animated document itself', () => {
+  /*
+   * moji.blue's own client writes the raw Lottie JSON to `original` as
+   * `application/json`, which formats_v1.original does not accept, so strict
+   * validation drops the whole record. The lottie slot is what we draw.
+   */
+  const raw = {
+    $type: 'blue.moji.collection.item',
+    name: ':telemoji_1f51e:',
+    createdAt: '2026-11-17T10:18:55.065Z',
+    formats: {
+      $type: 'blue.moji.collection.item#formats_v1',
+      lottie: {
+        $type: 'blob',
+        ref: CID.parse(lottieCid),
+        size: 51553,
+        mimeType: 'application/json',
+      },
+      original: {
+        $type: 'blob',
+        ref: CID.parse(lottieCid),
+        size: 51553,
+        mimeType: 'application/json',
+      },
+    },
+  }
+  expect(blue.moji.collection.item.$ifMatches(raw)).toBeUndefined()
+  const record = parseBluemojiItemRecord(raw)
+  expect(record?.name).toBe(':telemoji_1f51e:')
+  expect(record && getBluemojiLottieCid({...animatedItem, record})).toBe(
+    lottieCid,
+  )
+  /* A record the lexicon accepts is returned untouched, `original` included. */
+  expect(parseBluemojiItemRecord(animatedItem.record)).toEqual(
+    blue.moji.collection.item.$ifMatches(animatedItem.record),
+  )
+})

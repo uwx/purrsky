@@ -56,7 +56,10 @@ import {
   type EmojiSuggestion,
 } from '#/features/bluemoji/editorSuggestion'
 import {useComposerBluemojiItems} from '#/features/bluemoji/useComposerItems'
-import {getBluemojiImage, getBluemojiModeration} from '#/features/bluemoji/util'
+import {
+  getBluemojiModeration,
+  isBluemojiRenderable,
+} from '#/features/bluemoji/util'
 import {app} from '#/lexicons'
 import * as bsky from '#/types/bsky'
 import {type TextInputProps} from './TextInput.types'
@@ -468,7 +471,7 @@ export function TextInput({
     const allowed = new Map(
       [...bluemojiItems].filter(
         ([, item]) =>
-          getBluemojiImage(item) &&
+          isBluemojiRenderable(item) &&
           getBluemojiModeration(item, moderationOpts) === 'ignore',
       ),
     )

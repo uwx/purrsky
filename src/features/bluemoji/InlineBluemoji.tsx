@@ -12,8 +12,12 @@ import {Portal} from '#/components/Portal'
 import * as Tooltip from '#/components/Tooltip'
 import {IS_NATIVE} from '#/env'
 import {BluemojiDetails} from '#/features/bluemoji/BluemojiDetails'
+import {InlineLottie} from '#/features/bluemoji/BluemojiLottie'
 import {InlineImage} from '#/features/bluemoji/InlineImage'
-import {useBluemojiItemQuery} from '#/features/bluemoji/queries'
+import {
+  useBluemojiItemQuery,
+  useBluemojiLottieUrl,
+} from '#/features/bluemoji/queries'
 import {
   type BluemojiRef,
   getBluemojiImage,
@@ -41,26 +45,41 @@ export function InlineBluemoji({
   const autoplayDisabled = useAutoplayDisabled()
   const instance = useBluemojiInstance()
   const [failedUri, setFailedUri] = useState<string>()
-  const uri =
-    item && getBluemojiModeration(item, opts) === 'ignore'
-      ? getBluemojiImage(item, instance)
-      : undefined
-  if (!uri || uri === failedUri || !item) return fallbackText
-  const alt = item.record.alt?.trim() || item.record.name
-  const image = (
-    <InlineImage
-      testID="inlineBluemoji"
-      source={{uri}}
-      accessibilityLabel={alt}
-      accessibilityHint={undefined}
-      size={size}
-      baselineOffset={baselineOffset}
-      contentFit="contain"
-      autoplay={!autoplayDisabled}
-      onError={() => setFailedUri(uri)}
-    />
-  )
-  if (!interactive) return image
+  const lottieUri = useBluemojiLottieUrl(item ?? undefined)
+  const shown =
+    item && getBluemojiModeration(item, opts) === 'ignore' ? item : undefined
+  const imageUri = shown && getBluemojiImage(shown, instance)
+  /* Either rendition can be the item's only one, and either can fail. */
+  const uri = shown
+    ? [imageUri, lottieUri].find(u => u && u !== failedUri)
+    : undefined
+  if (!uri || !shown) return fallbackText
+  const alt = shown.record.alt?.trim() || shown.record.name
+  const media =
+    uri === imageUri ? (
+      <InlineImage
+        testID="inlineBluemoji"
+        source={{uri}}
+        accessibilityLabel={alt}
+        accessibilityHint={undefined}
+        size={size}
+        baselineOffset={baselineOffset}
+        contentFit="contain"
+        autoplay={!autoplayDisabled}
+        onError={() => setFailedUri(uri)}
+      />
+    ) : (
+      <InlineLottie
+        testID="inlineBluemoji"
+        uri={uri}
+        size={size}
+        baselineOffset={baselineOffset}
+        autoplay={!autoplayDisabled}
+        label={alt}
+        onError={() => setFailedUri(uri)}
+      />
+    )
+  if (!interactive) return media
   if (IS_NATIVE) {
     return (
       <>
@@ -69,14 +88,14 @@ export function InlineBluemoji({
           style={{width: size, height: size}}
           accessibilityRole="button"
           accessibilityLabel={
-            alt === item.record.name ? alt : `${item.record.name} ${alt}`
+            alt === shown.record.name ? alt : `${shown.record.name} ${alt}`
           }
           accessibilityHint={l`Show emoji details`}
           onPress={event => {
             event.stopPropagation()
             detailsControl.open()
           }}>
-          {image}
+          {media}
         </Pressable>
         <Portal>
           <Dialog.Outer
@@ -84,7 +103,7 @@ export function InlineBluemoji({
             nativeOptions={{preventExpansion: true}}>
             <Dialog.Handle />
             <Dialog.ScrollableInner label={l`Emoji details`}>
-              <BluemojiDetails item={item} uri={uri} alt={alt} />
+              <BluemojiDetails item={shown} alt={alt} />
             </Dialog.ScrollableInner>
           </Dialog.Outer>
         </Portal>
@@ -97,7 +116,9 @@ export function InlineBluemoji({
         style={web({display: 'inline-block', verticalAlign: 'baseline'})}>
         <Button
           testID="bluemojiDetails"
-          label={alt === item.record.name ? alt : `${item.record.name} ${alt}`}
+          label={
+            alt === shown.record.name ? alt : `${shown.record.name} ${alt}`
+          }
           accessibilityHint={l`Show emoji details`}
           style={web({display: 'inline-block', verticalAlign: 'baseline'})}
           onPress={event => {
@@ -105,11 +126,11 @@ export function InlineBluemoji({
             event.stopPropagation()
             setVisible(!visible)
           }}>
-          {image}
+          {media}
         </Button>
       </Tooltip.Target>
       <Tooltip.Content label={l`Emoji details`}>
-        <BluemojiDetails item={item} uri={uri} alt={alt} />
+        <BluemojiDetails item={shown} alt={alt} />
       </Tooltip.Content>
     </Tooltip.Outer>
   )

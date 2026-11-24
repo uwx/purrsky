@@ -44,16 +44,22 @@ export function getReactionEmojiImage(emoji: ReactionEmoji, instance?: string) {
  * arrive as blob objects (`{ref, size, mimeType}`) rather than the CID strings
  * the inline-facet lexicon describes. Accept both.
  */
+function formatCid(entry: unknown) {
+  if (typeof entry === 'string') return entry || undefined
+  if (!entry || typeof entry !== 'object' || !('ref' in entry)) return
+  const ref = entry.ref
+  if (typeof ref === 'string') return ref
+  if (ref && typeof ref === 'object' && '$link' in ref) {
+    const link = ref.$link
+    if (typeof link === 'string') return link
+  }
+  return undefined
+}
+
 export function getRenditionCid(value: ReactionEmoji) {
   const formats = (value.formats ?? {}) as Record<string, unknown>
   for (const slot of ['webp_128', 'gif_128', 'apng_128', 'png_128']) {
-    const entry = formats[slot]
-    const cid =
-      entry && typeof entry === 'object' && 'ref' in entry
-        ? (entry as {ref: {$link?: string}}).ref?.$link
-        : typeof entry === 'string'
-          ? entry
-          : undefined
+    const cid = formatCid(formats[slot])
     if (cid) return cid
   }
   return undefined
@@ -83,10 +89,14 @@ export function toReactionEmoji(item: BluemojiItem): ReactionEmoji {
     $type: 'blue.moji.richtext.facet#formats_v1',
   }
   const source = item.record.formats as Record<string, unknown>
-  for (const slot of ['png_128', 'webp_128', 'gif_128', 'apng_128'] as const) {
-    const cid = getRenditionCid({
-      formats: {[slot]: source?.[slot]},
-    } as ReactionEmoji)
+  for (const slot of [
+    'png_128',
+    'webp_128',
+    'gif_128',
+    'apng_128',
+    'lottie',
+  ] as const) {
+    const cid = formatCid(source?.[slot])
     if (cid) formats[slot] = cid
   }
   return {
@@ -128,5 +138,3 @@ export function reactionEmojiToItem(emoji: ReactionEmoji): BluemojiItem | null {
 export function getReactionEmojiAlt(emoji: ReactionEmoji) {
   return emoji.alt?.trim() || emoji.name
 }
-
-

@@ -8,8 +8,7 @@
       "ExpoBlueskyVisibilityViewModule",
       "ExpoPlatformInfoModule",
       "ExpoBlueskyNotificationSettingsModule",
-      "ExpoComposerEmojiLayoutModule"
-      "ExpoBlueskyNotificationSettingsModule",
+      "ExpoComposerEmojiLayoutModule",
       "ExpoBlueskyWidgetInfoModule"
     ]
   },

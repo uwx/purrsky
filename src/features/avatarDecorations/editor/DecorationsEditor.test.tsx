@@ -254,6 +254,25 @@ it('saves the picked frame, shape, gradient, and outline together', () => {
   })
 })
 
+it('offers a triangle shape that previews and saves', () => {
+  const {getByTestId, getByLabelText} = renderEditor()
+
+  // Pressing by label also proves SHAPE_LABELS has an entry; a missing one
+  // would render a button with no accessible name.
+  fireEvent.press(getByLabelText('Triangle'))
+
+  expect(getByTestId('previewAvatar')).toHaveProp(
+    'accessibilityLabel',
+    'triangle none',
+  )
+
+  fireEvent.press(getByTestId('saveDecorations'))
+  expect(mockSave).toHaveBeenCalledWith({
+    avatarShape: 'triangle',
+    nameOutline: false,
+  })
+})
+
 it('previews pending choices before they are saved', () => {
   const {getByTestId} = renderEditor()
 

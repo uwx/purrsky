@@ -23,6 +23,13 @@ export type EmojiDraft = {
   /** New image, as returned by the picker. Omitting it keeps the current one. */
   image?: PickerImage
   adultOnly?: boolean
+  /**
+   * SPDX expression such as `CC-BY-4.0`. Omitting it keeps whatever the edited
+   * record carried; an empty string clears it. Absent means "unspecified",
+   * which the copy gate reads as "no permission", so this is the only thing
+   * that lets anyone else add the emoji to their own collection.
+   */
+  license?: string
 }
 
 function rkeyOf(uri: string) {
@@ -41,6 +48,7 @@ async function putEmoji(
     alt,
     image,
     adultOnly,
+    license,
     editing,
   }: EmojiDraft & {editing?: BluemojiItem},
 ) {
@@ -49,6 +57,13 @@ async function putEmoji(
   // have rkeys unrelated to their alias.
   const previousRkey = editing ? rkeyOf(editing.uri) : ''
   const unchangedAlias = editing?.record.name === name
+  // `undefined` means the caller has no licence field (bulk upload), so an edit
+  // keeps what the record already says instead of silently dropping it. An
+  // empty string is a deliberate clear.
+  const nextLicense =
+    license === undefined
+      ? editing?.record.license || undefined
+      : license.trim() || undefined
   const formats = image
     ? {
         $type: 'blue.moji.collection.item#formats_v1' as const,
@@ -66,6 +81,7 @@ async function putEmoji(
       name,
       alt: alt?.trim() || undefined,
       adultOnly: adultOnly || undefined,
+      license: nextLicense,
       createdAt: editing?.record.createdAt ?? new Date().toISOString(),
       formats,
     },

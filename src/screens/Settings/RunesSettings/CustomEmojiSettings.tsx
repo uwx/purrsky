@@ -22,6 +22,7 @@ import {
 import {useOwnCollectionQuery} from '#/features/bluemoji/collection/queries'
 import {PacksSection} from '#/features/bluemoji/packs/PacksSection'
 import {NewEmojiTile, Tile, TileGrid} from '#/features/bluemoji/Picker'
+import {isCopyableLicense} from '#/features/bluemoji/provenance'
 import {type BluemojiItem} from '#/features/bluemoji/util'
 import {RunesScreenLayout} from './components/RunesScreenLayout'
 
@@ -169,6 +170,7 @@ function EmojiForm({
   const [alias, setAlias] = useState(editing?.record.name ?? '')
   const [alt, setAlt] = useState(editing?.record.alt ?? '')
   const [adultOnly, setAdultOnly] = useState(editing?.record.adultOnly ?? false)
+  const [license, setLicense] = useState(editing?.record.license ?? '')
 
   const pick = async () => {
     const [asset] = await openPicker()
@@ -274,6 +276,43 @@ function EmojiForm({
           </Trans>
         </Text>
 
+        <TextField.Root>
+          <TextField.LabelText>
+            <Trans>License</Trans>
+          </TextField.LabelText>
+          <TextField.Input
+            label={l`License`}
+            placeholder="CC-BY-4.0"
+            value={license}
+            onChangeText={setLicense}
+            maxLength={128}
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+        </TextField.Root>
+
+        <Text style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
+          {license.trim() ? (
+            isCopyableLicense(license) ? (
+              <Trans>
+                Anyone may add this emoji to their own collection. Use an SPDX
+                identifier such as CC-BY-4.0 or CC0-1.0.
+              </Trans>
+            ) : (
+              <Trans>
+                Others cannot add this emoji to their collection, because this
+                licence does not grant that. Use an SPDX identifier such as
+                CC-BY-4.0 or CC0-1.0 to allow it.
+              </Trans>
+            )
+          ) : (
+            <Trans>
+              Without a licence nobody else can add this emoji to their
+              collection. Leave it empty to keep it yours alone.
+            </Trans>
+          )}
+        </Text>
+
         <Toggle.Item
           name="adult_only"
           label={l`Adult content`}
@@ -298,7 +337,14 @@ function EmojiForm({
           label={editing ? l`Save emoji` : l`Add emoji`}
           onPress={() => {
             save(
-              {alias, alt, adultOnly, image: file ?? undefined, editing},
+              {
+                alias,
+                alt,
+                adultOnly,
+                license,
+                image: file ?? undefined,
+                editing,
+              },
               {onSuccess: onDone},
             )
           }}>

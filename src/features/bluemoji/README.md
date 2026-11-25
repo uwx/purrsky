@@ -85,6 +85,14 @@ users while logged-out rendering looked fine.
   because there is no count to gate it on, and it reads the repo only when
   focused.
 
+The copy gate reads `blue.moji.collection.item.license`, not the pack's, so the
+licence has to be on the emoji. `collection/mutations.ts` writes it from both
+editors: the single form has a licence field, and a bulk upload applies one
+licence to the whole batch. Each field says whether what was typed actually
+permits copying, using the same `isCopyableLicense` the copy flow uses, because
+an unrecognised expression is indistinguishable from no permission once written.
+An edit that omits the field keeps the stored licence; an empty one clears it.
+
 `functions/profile/[name]/emoji-pack/[rkey].ts` supplies the Open Graph tags
 non-Witchsky clients see for a pack link. Provenance fields (`source`,
 `license`) are self-asserted: `src/features/bluemoji/provenance.ts` only links

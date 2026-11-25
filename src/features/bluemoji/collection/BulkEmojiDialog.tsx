@@ -13,6 +13,7 @@ import {Text} from '#/components/Typography'
 import {IS_WEB} from '#/env'
 import {aliasFromFileName, aliasToRkey} from '#/features/bluemoji/alias'
 import {type EmojiDraft} from '#/features/bluemoji/collection/mutations'
+import {isCopyableLicense} from '#/features/bluemoji/provenance'
 
 /** A picked file plus the alias it will be saved under. */
 type Row = {image: RNImage & {fileName?: string}; alias: string}
@@ -33,6 +34,7 @@ export function BulkEmojiDialogForm({
   const t = useTheme()
   const [rows, setRows] = useState<Row[]>([])
   const [done, setDone] = useState(0)
+  const [license, setLicense] = useState('')
 
   const pick = async () => {
     const images = await openMultiplePicker()
@@ -64,6 +66,7 @@ export function BulkEmojiDialogForm({
     for (const row of rows) {
       drafts.push({
         alias: row.alias,
+        license,
         image: await compressIfNeeded(row.image, {
           maxDimension: 128,
           maxSize: 128_000,
@@ -96,6 +99,34 @@ export function BulkEmojiDialogForm({
             </ButtonText>
           </Button>
         </View>
+
+        <TextField.Root>
+          <TextField.LabelText>
+            <Trans>License</Trans>
+          </TextField.LabelText>
+          <TextField.Input
+            label={l`License`}
+            placeholder="CC-BY-4.0"
+            value={license}
+            onChangeText={setLicense}
+            maxLength={128}
+            autoCapitalize="characters"
+            autoCorrect={false}
+          />
+        </TextField.Root>
+        <Text style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
+          {license.trim() && !isCopyableLicense(license) ? (
+            <Trans>
+              This licence does not let others add these emoji to their
+              collection. Use an SPDX identifier such as CC-BY-4.0 or CC0-1.0.
+            </Trans>
+          ) : (
+            <Trans>
+              Applies to every emoji in this batch. Without a licence, others
+              cannot add them to their collection.
+            </Trans>
+          )}
+        </Text>
 
         {rows.map((row, index) => (
           <View key={`${row.image.path}-${index}`} style={[a.gap_2xs]}>

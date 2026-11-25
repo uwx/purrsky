@@ -40,13 +40,13 @@ import {
   usePackContentsQuery,
   usePackQuery,
 } from '#/features/bluemoji/packs/queries'
-import {
-  getPackIconUrl,
-  isCopyableLicense,
-  packShareUrl,
-} from '#/features/bluemoji/packs/util'
+import {getPackIconUrl, packShareUrl} from '#/features/bluemoji/packs/util'
 import {Tile, TileGrid} from '#/features/bluemoji/Picker'
-import {getLicenseUrl, getSafeSourceUrl} from '#/features/bluemoji/provenance'
+import {
+  getLicenseUrl,
+  getSafeSourceUrl,
+  isCopyableLicense,
+} from '#/features/bluemoji/provenance'
 import {
   type BluemojiItem,
   getBluemojiModeration,

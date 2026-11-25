@@ -4,7 +4,6 @@ import {
   getPackDescriptionError,
   getPackEmbedRoute,
   getPackNameError,
-  isCopyableLicense,
   PACK_COLLECTION,
   PACK_DESCRIPTION_MAX_GRAPHEMES,
   PACK_NAME_MAX_BYTES,
@@ -66,31 +65,6 @@ describe('pack URLs', () => {
       }),
     ).toEqual({name: 'alice.test', rkey: '3abc'})
     expect(getPackEmbedRoute({uri: 'https://example.com/post'})).toBeUndefined()
-  })
-})
-
-describe('copy permission', () => {
-  it('treats a missing licence as no permission', () => {
-    expect(isCopyableLicense(undefined)).toBe(false)
-    expect(isCopyableLicense('')).toBe(false)
-    expect(isCopyableLicense('  ')).toBe(false)
-  })
-
-  it('accepts permissive licences case-insensitively', () => {
-    expect(isCopyableLicense('CC0-1.0')).toBe(true)
-    expect(isCopyableLicense('cc-by-4.0')).toBe(true)
-    expect(isCopyableLicense('MIT')).toBe(true)
-    expect(isCopyableLicense('GPL-3.0-only')).toBe(false)
-    expect(isCopyableLicense('LicenseRef-All-Rights-Reserved')).toBe(false)
-  })
-
-  it('applies OR and AND as written', () => {
-    expect(isCopyableLicense('CC-BY-4.0 OR LicenseRef-Commercial')).toBe(true)
-    expect(isCopyableLicense('MIT OR GPL-3.0-only')).toBe(true)
-    expect(isCopyableLicense('MIT AND CC-BY-4.0')).toBe(true)
-    expect(isCopyableLicense('MIT AND GPL-3.0-only')).toBe(false)
-    expect(isCopyableLicense('(MIT OR CC0-1.0) AND GPL-3.0-only')).toBe(false)
-    expect(isCopyableLicense('Apache-2.0 AND (MIT OR CC0-1.0)')).toBe(true)
   })
 })
 

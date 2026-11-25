@@ -150,3 +150,56 @@ it('deletes by the record rkey, not the alias', async () => {
   expect(calls()[0][0].$nsid).toBe('com.atproto.repo.deleteRecord')
   expect(calls()[0][1]).toMatchObject({rkey: 'hist0rical'})
 })
+
+it('writes the licence that lets others copy the emoji', async () => {
+  const queryClient = new QueryClient()
+  const {result} = renderHook(() => useSaveEmojiMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  await result.current.mutateAsync({
+    alias: ':blobcat:',
+    license: ' CC0-1.0 ',
+    image: {path: '/tmp/cat.png', mime: 'image/png'} as never,
+  })
+
+  expect(calls()[0][1].record).toMatchObject({license: 'CC0-1.0'})
+})
+
+it('keeps the stored licence when an edit does not mention one', async () => {
+  const queryClient = new QueryClient()
+  const licensed = {
+    ...item,
+    record: {...item.record, license: 'CC-BY-4.0'},
+  } as BluemojiItem
+  const {result} = renderHook(() => useSaveEmojiMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  // The bulk flow never sets a licence and must not erase what a single edit
+  // wrote earlier.
+  await result.current.mutateAsync({alias: ':blobcat:', editing: licensed})
+
+  expect(calls()[0][1].record).toMatchObject({license: 'CC-BY-4.0'})
+})
+
+it('clears the licence when asked to', async () => {
+  const queryClient = new QueryClient()
+  const licensed = {
+    ...item,
+    record: {...item.record, license: 'CC-BY-4.0'},
+  } as BluemojiItem
+  const {result} = renderHook(() => useSaveEmojiMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  await result.current.mutateAsync({
+    alias: ':blobcat:',
+    license: '  ',
+    editing: licensed,
+  })
+
+  // Absent once serialised, not an empty string: "unspecified" is the absence
+  // of a value.
+  expect(calls()[0][1].record?.license).toBeUndefined()
+})

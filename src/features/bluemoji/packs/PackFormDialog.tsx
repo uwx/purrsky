@@ -179,8 +179,9 @@ export function PackFormDialog({
         </TextField.Root>
         <Text style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
           <Trans>
-            A licence on an emoji, not the pack, decides whether someone else
-            may add it to their collection.
+            This describes the pack. Whether someone else may add an emoji to
+            their own collection is decided by that emoji's licence, set on the
+            emoji itself.
           </Trans>
         </Text>
 

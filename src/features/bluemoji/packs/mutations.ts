@@ -18,7 +18,10 @@ import {usePdsClient} from '#/state/session'
 import * as Toast from '#/components/Toast'
 import {aliasToRkey, normalizeAlias} from '#/features/bluemoji/alias'
 import {OWN_COLLECTION_ROOT} from '#/features/bluemoji/collection/queries'
-import {getSafeSourceUrl} from '#/features/bluemoji/provenance'
+import {
+  getSafeSourceUrl,
+  isCopyableLicense,
+} from '#/features/bluemoji/provenance'
 import {
   type BluemojiItem,
   parseBluemojiItemRecord,
@@ -33,7 +36,6 @@ import {
   getPackDescriptionError,
   getPackNameError,
   getPackRenditionUrl,
-  isCopyableLicense,
   PACK_COLLECTION,
   PACK_ITEM_COLLECTION,
   packRkey,

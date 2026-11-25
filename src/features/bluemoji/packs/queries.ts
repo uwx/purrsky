@@ -16,6 +16,7 @@ import {
   PACK_COLLECTION,
   PACK_ITEM_COLLECTION,
   packAtUri,
+  type PackMembership,
 } from './util'
 
 export const PACKS_ROOT = 'useEmojiPacksQuery'
@@ -132,7 +133,13 @@ export async function fetchPackContents(pack: BluemojiPack) {
 
 export async function fetchPacks(did: string) {
   const connection = await connect(did)
-  if (!connection) return {packs: [], counts: {} as Record<string, number>}
+  if (!connection) {
+    return {
+      packs: [],
+      counts: {} as Record<string, number>,
+      memberships: [] as PackMembership[],
+    }
+  }
   const {client, pdsUrl} = connection
   const packs: BluemojiPack[] = []
   for (const record of await listAll(client, did, PACK_COLLECTION, {
@@ -150,6 +157,7 @@ export async function fetchPacks(did: string) {
   }
 
   const counts: Record<string, number> = {}
+  const memberships: PackMembership[] = []
   const packUris: Record<string, true> = {}
   for (const pack of packs) packUris[pack.uri] = true
   try {
@@ -157,11 +165,16 @@ export async function fetchPacks(did: string) {
       const value = blue.moji.packs.packitem.$ifMatches(record.value)
       if (!value || !packUris[value.pack]) continue
       counts[value.pack] = (counts[value.pack] ?? 0) + 1
+      memberships.push({
+        uri: record.uri,
+        subject: value.subject,
+        pack: value.pack,
+      })
     }
   } catch {
-    // Counts are decoration; the pack list itself already loaded.
+    // The pack list itself already loaded; counts and grouping are decoration.
   }
-  return {packs, counts}
+  return {packs, counts, memberships}
 }
 
 export function usePackQuery({
@@ -197,7 +210,9 @@ export function usePacksQuery({
     enabled: enabled && deferred && Boolean(did),
     retry: false,
     queryFn: () =>
-      did ? fetchPacks(did) : Promise.resolve({packs: [], counts: {}}),
+      did
+        ? fetchPacks(did)
+        : Promise.resolve({packs: [], counts: {}, memberships: []}),
   })
 }
 

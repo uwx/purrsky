@@ -3,6 +3,7 @@ import {countGraphemes} from 'unicode-segmenter/grapheme'
 
 import {BSKY_APP_HOST} from '#/lib/strings/url-helpers'
 import {IS_WEB} from '#/env'
+import {type BluemojiItem} from '#/features/bluemoji/util'
 import {type blue} from '#/lexicons'
 import {PACK_COLLECTION, PACK_ITEM_COLLECTION} from './collections'
 export {PACK_COLLECTION, PACK_ITEM_COLLECTION}
@@ -26,6 +27,9 @@ export type BluemojiPackItem = {
   /** AT-URI of the emoji this membership points at. */
   subject: string
 }
+
+/** A membership read alongside its pack, for filing emoji under a pack. */
+export type PackMembership = BluemojiPackItem & {pack: string}
 
 export function packAtUri(did: string, rkey: string) {
   return `at://${did}/${PACK_COLLECTION}/${rkey}`
@@ -197,4 +201,49 @@ export function getBlobRefs(record: blue.moji.collection.item.Main) {
     }
   }
   return refs
+}
+
+/** One labelled block of the picker: a pack's emoji, or what is left over. */
+export type EmojiPackSection = {
+  /** Absent for emoji that are in no pack. */
+  pack?: BluemojiPack
+  items: BluemojiItem[]
+}
+
+/**
+ * Files each emoji under the first pack that lists it, in pack order, keeping
+ * the collection's own order inside a section. An emoji can sit in several
+ * packs; showing it once keeps the grid scannable. Emoji in no pack come back
+ * as a final unlabelled section, so nothing is hidden.
+ */
+export function groupItemsByPack(
+  items: BluemojiItem[],
+  packs: BluemojiPack[],
+  memberships: PackMembership[],
+): EmojiPackSection[] {
+  const rank = new Map(packs.map((pack, index) => [pack.uri, index]))
+  const filedUnder = new Map<string, number>()
+  for (const membership of memberships) {
+    const index = rank.get(membership.pack)
+    if (index === undefined) continue
+    const current = filedUnder.get(membership.subject)
+    if (current === undefined || index < current) {
+      filedUnder.set(membership.subject, index)
+    }
+  }
+
+  const sections: EmojiPackSection[] = packs.map(pack => ({
+    pack,
+    items: [],
+  }))
+  const loose: BluemojiItem[] = []
+  for (const item of items) {
+    const index = filedUnder.get(item.uri)
+    if (index === undefined) loose.push(item)
+    else sections[index].items.push(item)
+  }
+
+  const result = sections.filter(section => section.items.length > 0)
+  if (loose.length) result.push({items: loose})
+  return result
 }

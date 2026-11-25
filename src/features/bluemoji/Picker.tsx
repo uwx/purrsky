@@ -17,6 +17,8 @@ import * as Skeleton from '#/components/Skeleton'
 import {Text} from '#/components/Typography'
 import {BluemojiImage} from '#/features/bluemoji/BluemojiImage'
 import {useOwnCollectionQuery} from '#/features/bluemoji/collection/queries'
+import {useOwnPacksQuery} from '#/features/bluemoji/packs/queries'
+import {groupItemsByPack} from '#/features/bluemoji/packs/util'
 import {
   useBluemojiItemQuery,
   useBluemojiSearchQuery,
@@ -32,6 +34,9 @@ import {
 import {type blue} from '#/lexicons'
 
 const TILE = 44
+
+const stopPropagation = (event: {stopPropagation: () => void}) =>
+  event.stopPropagation()
 
 /**
  * The emoji grid, shared by the composer picker, the reaction sheet, and the
@@ -84,7 +89,16 @@ export function EmojiGrid({
             </SegmentedControl.Item>
           </SegmentedControl.Root>
           <View style={[a.flex_row, a.gap_xs, a.align_center]}>
-            <View style={[a.flex_1]}>
+            {/*
+             * The picker can render inside a post, and a press on the bare
+             * input would bubble up to the post's link and open the post.
+             */}
+            <View
+              style={[a.flex_1]}
+              {...web({
+                onClick: stopPropagation,
+                onTouchEnd: stopPropagation,
+              })}>
               <TextField.Root>
                 <TextField.Input
                   testID="bluemojiSearch"
@@ -132,6 +146,7 @@ function SearchGrid({
   chosen?: readonly string[]
 }) {
   const {t: l} = useLingui()
+  const t = useTheme()
   const {currentAccount} = useSession()
   /*
    * Listing our own emoji reads our PDS: moji.blue only lists what its
@@ -139,6 +154,7 @@ function SearchGrid({
    */
   const own = !query.trim() && Boolean(repo) && repo === currentAccount?.did
   const ownItems = useOwnCollectionQuery({enabled: own})
+  const ownPacks = useOwnPacksQuery({enabled: own})
   const search = useBluemojiSearchQuery({repo, query, enabled: !own})
   const hits = search.data?.pages.flatMap(page => page.items) ?? []
 
@@ -188,29 +204,63 @@ function SearchGrid({
     )
   }
 
+  if (own && ownPacks.isPending) {
+    return <TileGrid>{skeletons(8)}</TileGrid>
+  }
+
+  /*
+   * A pack can list hundreds of emoji, so the own collection is filed under one
+   * heading per pack. Anything in no pack trails the list, unlabelled.
+   */
+  const blocks = own
+    ? groupItemsByPack(
+        ownItems.data ?? [],
+        ownPacks.data?.packs ?? [],
+        ownPacks.data?.memberships ?? [],
+      )
+    : []
+
   return (
     <View style={[a.gap_sm]}>
-      <TileGrid>
-        {own
-          ? ownItems.data!.map(item => (
-              <Tile
-                key={item.uri}
-                label={item.record.name}
-                onPress={() => onSelect(item)}
-                item={item}
-                selected={chosen?.includes(item.uri)}
-              />
-            ))
-          : hits.map(item => (
-              <SearchTile
-                key={item.uri ?? `${item.did}/${item.name}`}
-                item={item}
-                onSelect={onSelect}
-                selected={chosen?.includes(item.uri ?? '')}
-              />
-            ))}
-        {onNewCollection ? <NewEmojiTile onPress={onNewCollection} /> : null}
-      </TileGrid>
+      {own ? (
+        blocks.map((block, index) => (
+          <View key={block.pack?.uri ?? 'other'} style={[a.gap_xs]}>
+            {block.pack ? (
+              <Text
+                emoji
+                style={[a.text_xs, a.font_semi_bold, a.px_xs, t.atoms.text]}>
+                {block.pack.record.name}
+              </Text>
+            ) : null}
+            <TileGrid>
+              {block.items.map(item => (
+                <Tile
+                  key={item.uri}
+                  label={item.record.name}
+                  onPress={() => onSelect(item)}
+                  item={item}
+                  selected={chosen?.includes(item.uri)}
+                />
+              ))}
+              {onNewCollection && index === blocks.length - 1 ? (
+                <NewEmojiTile onPress={onNewCollection} />
+              ) : null}
+            </TileGrid>
+          </View>
+        ))
+      ) : (
+        <TileGrid>
+          {hits.map(item => (
+            <SearchTile
+              key={item.uri ?? `${item.did}/${item.name}`}
+              item={item}
+              onSelect={onSelect}
+              selected={chosen?.includes(item.uri ?? '')}
+            />
+          ))}
+          {onNewCollection ? <NewEmojiTile onPress={onNewCollection} /> : null}
+        </TileGrid>
+      )}
       {!own && search.hasNextPage ? (
         <Button
           size="small"

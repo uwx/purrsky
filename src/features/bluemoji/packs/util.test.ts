@@ -1,14 +1,18 @@
 import {
+  type BluemojiPack,
   getBlobCid,
   getBlobRefs,
   getPackDescriptionError,
   getPackEmbedRoute,
   getPackNameError,
+  groupItemsByPack,
   PACK_COLLECTION,
   PACK_DESCRIPTION_MAX_GRAPHEMES,
   PACK_NAME_MAX_BYTES,
+  type PackMembership,
   parsePackUrl,
 } from '#/features/bluemoji/packs/util'
+import {type BluemojiItem} from '#/features/bluemoji/util'
 import {type blue} from '#/lexicons'
 
 describe('pack URLs', () => {
@@ -119,5 +123,74 @@ describe('blob refs', () => {
       {slot: 'webp_128', cid: 'bafywebp', mimeType: 'image/webp'},
       {slot: 'png_128', cid: 'bafypng', mimeType: 'image/png'},
     ])
+  })
+})
+
+describe('grouping the picker by pack', () => {
+  function pack(uri: string, name: string) {
+    return {uri, record: {name}} as BluemojiPack
+  }
+
+  function item(uri: string) {
+    return {uri} as BluemojiItem
+  }
+
+  function membership(packUri: string, subject: string): PackMembership {
+    return {
+      uri: `at://did:plc:me/blue.moji.packs.packitem/${subject}`,
+      subject,
+      pack: packUri,
+    }
+  }
+
+  it('files emoji under their pack, in pack order, with unpacks last', () => {
+    const cats = pack('at://did:plc:me/blue.moji.packs.pack/cats', 'cats')
+    const dogs = pack('at://did:plc:me/blue.moji.packs.pack/dogs', 'dogs')
+    const a = item('at://did:plc:me/blue.moji.collection.item/a')
+    const b = item('at://did:plc:me/blue.moji.collection.item/b')
+    const loose = item('at://did:plc:me/blue.moji.collection.item/loose')
+
+    const groups = groupItemsByPack(
+      [loose, b, a],
+      [cats, dogs],
+      [membership(cats.uri, b.uri), membership(dogs.uri, a.uri)],
+    )
+
+    expect(groups.map(group => group.pack?.record.name)).toEqual([
+      'cats',
+      'dogs',
+      undefined,
+    ])
+    expect(groups.map(group => group.items)).toEqual([[b], [a], [loose]])
+  })
+
+  it('shows an emoji that sits in several packs only once', () => {
+    const first = pack('at://did:plc:me/blue.moji.packs.pack/first', 'first')
+    const second = pack('at://did:plc:me/blue.moji.packs.pack/second', 'second')
+    const shared = item('at://did:plc:me/blue.moji.collection.item/shared')
+
+    const groups = groupItemsByPack(
+      [shared],
+      [first, second],
+      [membership(second.uri, shared.uri), membership(first.uri, shared.uri)],
+    )
+
+    expect(groups).toHaveLength(1)
+    expect(groups[0].pack?.record.name).toBe('first')
+    expect(groups[0].items).toEqual([shared])
+  })
+
+  it('drops packs that have no emoji in the collection', () => {
+    const empty = pack('at://did:plc:me/blue.moji.packs.pack/empty', 'empty')
+    const cats = pack('at://did:plc:me/blue.moji.packs.pack/cats', 'cats')
+    const a = item('at://did:plc:me/blue.moji.collection.item/a')
+
+    const groups = groupItemsByPack(
+      [a],
+      [empty, cats],
+      [membership(cats.uri, a.uri)],
+    )
+
+    expect(groups.map(group => group.pack?.record.name)).toEqual(['cats'])
   })
 })

@@ -117,23 +117,27 @@ it('draws a decoration ring instead of a plain border', () => {
   expect(queryByTestId('avatarHexagonBorder')).toBeNull()
 })
 
-it('clips a hexagon avatar and strokes it with the frame color', () => {
-  const {getByTestId, queryByTestId} = render(
-    <UserAvatar
-      type="user"
-      size={40}
-      avatar={avatar}
-      usePlainRNImage
-      profileShape="hexagon"
-      decoration={frame('flame-ring', 'Flame', '#F2571F')}
-    />,
-  )
+it.each(['hexagon', 'triangle'] as const)(
+  'clips a %s avatar and strokes it with the frame color',
+  profileShape => {
+    const {getByTestId, queryByTestId} = render(
+      <UserAvatar
+        type="user"
+        size={40}
+        avatar={avatar}
+        usePlainRNImage
+        profileShape={profileShape}
+        decoration={frame('flame-ring', 'Flame', '#F2571F')}
+      />,
+    )
 
-  // The ring overlay cannot follow a hexagon, so the stroke moves onto the path.
-  expect(queryByTestId('avatarDecorationRing')).toBeNull()
-  expect(getByTestId('avatarHexagonBorder')).toBeTruthy()
-  expect(getByTestId('avatarHexagonBorder')).toHaveProp('stroke', '#F2571F')
-})
+    // The ring overlay cannot follow a polygon, so the stroke moves onto the
+    // path.
+    expect(queryByTestId('avatarDecorationRing')).toBeNull()
+    expect(getByTestId('avatarHexagonBorder')).toBeTruthy()
+    expect(getByTestId('avatarHexagonBorder')).toHaveProp('stroke', '#F2571F')
+  },
+)
 
 it('never decorates a blurred avatar', () => {
   const {queryByTestId} = render(
@@ -192,6 +196,7 @@ it('does not look up playback where motion cannot be seen', () => {
   const cases = [
     {size: 24, props: {}},
     {size: 48, props: {profileShape: 'hexagon' as const}},
+    {size: 48, props: {profileShape: 'triangle' as const}},
     {size: 48, props: {moderation: {blur: true} as never}},
   ]
 

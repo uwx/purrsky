@@ -100,6 +100,8 @@ There are no Apple credentials in CI, so nothing is signed and no entitlements a
 
 Two optional repository variables change the iOS build without a code change: `WITCHSKY_BUNDLE_ID` (default `app.witchsky`) picks the bundle identifier, so a build can sit next to an App Store install, and `WITCHSKY_APPLE_TEAM_ID` sets `DEVELOPMENT_TEAM`.
 
+The IPA installs on iOS 17.0 and later. `react-native-executorch` (on-device alt text) ships ExecuTorch xcframeworks whose every slice is built for iOS 17.0 - `ExecutorchLib`, `CoreMLBackend`, `XnnpackBackend`, `MLXBackend` and the `libthreadpool` archives - and its podspec declares that same floor, so `ios.deploymentTarget` in `app.config.js` is 17.0 rather than the Expo SDK 58 default of 16.4; anything lower fails `pod install` with "required a higher minimum deployment target". This drops the devices that cap at iOS 16: iPhone 8, 8 Plus and X, plus the 5th-generation iPad and the first iPad Pro. Lowering it again means rebuilding ExecuTorch and its backends from source, because neither the number in the podspec nor the vendored binaries can be moved down on their own.
+
 Both platforms compile React Native from source (`buildReactNativeFromSource`), which is the bulk of the runtime. The iOS job deletes the unused Xcode installs and simulator runtimes first to make room on the runner disk. Xcode 26 ships the iOS platform as a downloadable component and some `macos-26-arm64` image instances come up without it, so the job probes `xcodebuild -showdestinations` and runs `xcodebuild -downloadPlatform iOS` when no device destination resolves. Every run restores and saves these caches:
 
 | Cache | Covers |

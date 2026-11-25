@@ -105,12 +105,16 @@ it('saves without a pack when the option is left alone', async () => {
   expect(onSave.mock.calls[0][2]).toBeUndefined()
 })
 
-it('refuses a pack name longer than the record allows', async () => {
+it('refuses a pack name that is too long in bytes, not characters', async () => {
   setup()
   await pickImages()
   fireEvent.press(screen.getByLabelText('Also save as a pack'))
-  fireEvent.changeText(screen.getByLabelText('Pack name'), 'x'.repeat(65))
+  /*
+   * 32 emoji are only 32 characters but 128 bytes, so the input's own
+   * maxLength cannot catch this; the byte check has to.
+   */
+  fireEvent.changeText(screen.getByLabelText('Pack name'), '😀'.repeat(32))
 
   expect(addButton()).toBeDisabled()
-  expect(screen.getByText(/64 characters or fewer/)).toBeTruthy()
+  expect(screen.getByText(/limited to 64/)).toBeTruthy()
 })

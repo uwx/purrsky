@@ -17,6 +17,8 @@ import {type EmojiDraft} from '#/features/bluemoji/collection/mutations'
 import {
   getPackDescriptionError,
   getPackNameError,
+  PACK_DESCRIPTION_MAX_GRAPHEMES,
+  PACK_NAME_MAX_BYTES,
 } from '#/features/bluemoji/packs/util'
 import {isCopyableLicense} from '#/features/bluemoji/provenance'
 
@@ -175,15 +177,14 @@ export function BulkEmojiDialogForm({
           <>
             <TextField.Root isInvalid={!!packNameError}>
               <TextField.LabelText>
-                <Trans>Pack name</Trans>
+                <Trans>Name</Trans>
               </TextField.LabelText>
               <TextField.Input
                 label={l`Pack name`}
                 placeholder={l`cute cats`}
                 value={packName}
                 onChangeText={setPackName}
-                autoCapitalize="none"
-                autoCorrect={false}
+                maxLength={PACK_NAME_MAX_BYTES}
               />
             </TextField.Root>
             {packNameError === 'empty' ? (
@@ -192,7 +193,7 @@ export function BulkEmojiDialogForm({
               </AliasProblemText>
             ) : packNameError ? (
               <AliasProblemText>
-                <Trans>Use 64 characters or fewer for the name.</Trans>
+                <Trans>Pack names are limited to 64 bytes.</Trans>
               </AliasProblemText>
             ) : null}
             <TextField.Root isInvalid={!!packDescriptionError}>
@@ -201,14 +202,19 @@ export function BulkEmojiDialogForm({
               </TextField.LabelText>
               <TextField.Input
                 label={l`Pack description`}
+                placeholder={l`What is in this pack?`}
                 value={packDescription}
                 onChangeText={setPackDescription}
                 multiline
+                numberOfLines={3}
               />
             </TextField.Root>
             {packDescriptionError ? (
               <AliasProblemText>
-                <Trans>Use 300 characters or fewer for the description.</Trans>
+                <Trans>
+                  Descriptions are limited to {PACK_DESCRIPTION_MAX_GRAPHEMES}
+                  characters.
+                </Trans>
               </AliasProblemText>
             ) : null}
             <Text

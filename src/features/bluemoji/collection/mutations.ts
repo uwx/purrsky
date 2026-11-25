@@ -11,6 +11,12 @@ import {usePdsClient} from '#/state/session'
 import * as Toast from '#/components/Toast'
 import {aliasToRkey, normalizeAlias} from '#/features/bluemoji/alias'
 import {OWN_COLLECTION_ROOT} from '#/features/bluemoji/collection/queries'
+import {
+  invalidatePacks,
+  type PackDraft,
+  writePack,
+  writePackItem,
+} from '#/features/bluemoji/packs/mutations'
 import {type BluemojiItem} from '#/features/bluemoji/util'
 import {com} from '#/lexicons'
 
@@ -64,18 +70,22 @@ async function putEmoji(
     license === undefined
       ? editing?.record.license || undefined
       : license.trim() || undefined
-  const formats = image
+  const uploaded = image
+    ? (await uploadBlob(pds, image.path, image.mime)).blob
+    : undefined
+  const formats = uploaded
     ? {
         $type: 'blue.moji.collection.item#formats_v1' as const,
-        png_128: (await uploadBlob(pds, image.path, image.mime)).blob,
+        png_128: uploaded,
       }
     : // Keep the existing renditions; the AppView serves those blobs.
       editing?.record.formats
   if (!formats) throw new Error('An emoji needs an image')
+  const rkey = unchangedAlias ? previousRkey : aliasToRkey(alias)
   await pds.call(com.atproto.repo.putRecord, {
     repo: pds.assertDid,
     collection: ITEM_COLLECTION,
-    rkey: unchangedAlias ? previousRkey : aliasToRkey(alias),
+    rkey,
     record: {
       $type: ITEM_COLLECTION,
       name,
@@ -95,7 +105,16 @@ async function putEmoji(
       rkey: previousRkey,
     })
   }
-  return {name, added: !editing}
+  return {
+    name,
+    added: !editing,
+    uri: `at://${pds.assertDid}/${ITEM_COLLECTION}/${rkey}`,
+    /*
+     * The blob this call uploaded, not the record's rendition: an edit without
+     * a new image has nothing new to use as a pack icon.
+     */
+    icon: uploaded,
+  }
 }
 
 /**
@@ -150,6 +169,10 @@ export function useSaveEmojiMutation() {
  * burst of twenty parallel uploads is the easiest way to get rate limited by a
  * PDS. One item failing does not stop the rest; the mismatches (usually a bad
  * alias) come back so the caller can name them.
+ *
+ * Passing `pack` creates it once the items are written and adds each of them
+ * as a membership, so the upload and the grouping happen in one pass. A pack
+ * failure is reported separately: the emoji are already saved by then.
  */
 export function useBulkEmojiMutation() {
   const pds = usePdsClient()
@@ -160,16 +183,20 @@ export function useBulkEmojiMutation() {
   return useMutation({
     mutationFn: async ({
       drafts,
+      pack,
       onProgress,
     }: {
       drafts: EmojiDraft[]
+      /** New pack to create and fill with every emoji that was written. */
+      pack?: {name: string; description?: string}
       onProgress?: (done: number) => void
     }) => {
       if (!pds.did) throw new Error('You need to sign in to add emoji')
       const failed: string[] = []
+      const written: {uri: string; icon: PackDraft['iconBlob']}[] = []
       for (const [i, draft] of drafts.entries()) {
         try {
-          await putEmoji(pds, draft)
+          written.push(await putEmoji(pds, draft))
         } catch (error) {
           failed.push(draft.alias)
           logger.error('Failed to add a custom emoji in bulk', {
@@ -178,19 +205,48 @@ export function useBulkEmojiMutation() {
         }
         onProgress?.(i + 1)
       }
-      return {added: drafts.length - failed.length, failed}
+      let packError: string | undefined
+      let packUrl: string | undefined
+      if (pack && written.length) {
+        try {
+          const saved = await writePack(pds, {
+            draft: {
+              name: pack.name,
+              description: pack.description,
+              // The first emoji that uploaded a blob doubles as the pack icon:
+              // it is already in this repo, so the pack needs no upload.
+              iconBlob: written.find(item => item.icon)?.icon,
+            },
+          })
+          for (const item of written) {
+            await writePackItem(pds, saved.uri, item.uri)
+          }
+          packUrl = saved.uri
+        } catch (error) {
+          packError = pack.name
+          logger.error('Failed to create a Bluemoji pack in bulk', {
+            safeMessage: error,
+          })
+        }
+      }
+      return {added: written.length, failed, packError, packUrl}
     },
-    onSuccess: ({added, failed}) => {
+    onSuccess: ({added, failed, packError, packUrl}) => {
       haptics.success()
-      Toast.show(
+      const notes = [
         failed.length
           ? l`Added ${added}. These could not be added: ${failed.join(', ')}`
           : l`Added ${added} emoji.`,
-        {type: failed.length ? 'warning' : undefined},
-      )
+        packUrl ? l`Put them in a new pack.` : undefined,
+        packError ? l`The pack ${packError} could not be created.` : undefined,
+      ].filter(Boolean)
+      Toast.show(notes.join(' '), {
+        type: failed.length || packError ? 'warning' : undefined,
+      })
       void queryClient.invalidateQueries({queryKey: [OWN_COLLECTION_ROOT]})
       void queryClient.invalidateQueries({queryKey: ['useBluemojiSearchQuery']})
       void queryClient.invalidateQueries({queryKey: ['useBluemojiItemQuery']})
+      if (packUrl) invalidatePacks(queryClient)
     },
   })
 }

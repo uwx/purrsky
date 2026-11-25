@@ -9,14 +9,22 @@ import {Admonition} from '#/components/Admonition'
 import {Button, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import * as TextField from '#/components/forms/TextField'
+import * as Toggle from '#/components/forms/Toggle'
 import {Text} from '#/components/Typography'
 import {IS_WEB} from '#/env'
 import {aliasFromFileName, aliasToRkey} from '#/features/bluemoji/alias'
 import {type EmojiDraft} from '#/features/bluemoji/collection/mutations'
+import {
+  getPackDescriptionError,
+  getPackNameError,
+} from '#/features/bluemoji/packs/util'
 import {isCopyableLicense} from '#/features/bluemoji/provenance'
 
 /** A picked file plus the alias it will be saved under. */
 type Row = {image: RNImage & {fileName?: string}; alias: string}
+
+/** The pack a bulk upload can create in the same pass, if the user opts in. */
+export type BulkPackDraft = {name: string; description?: string}
 
 /**
  * Add a whole folder of emoji in one go. Each alias defaults to the file name;
@@ -27,7 +35,11 @@ export function BulkEmojiDialogForm({
   onSave,
   isPending,
 }: {
-  onSave: (drafts: EmojiDraft[], onProgress: (done: number) => void) => void
+  onSave: (
+    drafts: EmojiDraft[],
+    onProgress: (done: number) => void,
+    pack?: BulkPackDraft,
+  ) => void
   isPending: boolean
 }) {
   const {t: l} = useLingui()
@@ -35,6 +47,13 @@ export function BulkEmojiDialogForm({
   const [rows, setRows] = useState<Row[]>([])
   const [done, setDone] = useState(0)
   const [license, setLicense] = useState('')
+  const [asPack, setAsPack] = useState(false)
+  const [packName, setPackName] = useState('')
+  const [packDescription, setPackDescription] = useState('')
+  const packNameError = asPack ? getPackNameError(packName) : undefined
+  const packDescriptionError = asPack
+    ? getPackDescriptionError(packDescription)
+    : undefined
 
   const pick = async () => {
     const images = await openMultiplePicker()
@@ -58,7 +77,12 @@ export function BulkEmojiDialogForm({
     .filter((alias, index, all) => alias && all.indexOf(alias) !== index)
   const invalid = rows.filter(row => !isValidAlias(row.alias))
   const canSubmit =
-    rows.length > 0 && !invalid.length && !duplicates.length && !isPending
+    rows.length > 0 &&
+    !invalid.length &&
+    !duplicates.length &&
+    !packNameError &&
+    !packDescriptionError &&
+    !isPending
 
   const save = async () => {
     // Resize up front, sequentially, so a huge folder does not spike memory.
@@ -74,7 +98,16 @@ export function BulkEmojiDialogForm({
       })
     }
     setDone(0)
-    onSave(drafts, setDone)
+    onSave(
+      drafts,
+      setDone,
+      asPack
+        ? {
+            name: packName.trim(),
+            description: packDescription.trim() || undefined,
+          }
+        : undefined,
+    )
   }
 
   return (
@@ -128,6 +161,66 @@ export function BulkEmojiDialogForm({
           )}
         </Text>
 
+        <Toggle.Item
+          name="as_pack"
+          label={l`Also save as a pack`}
+          value={asPack}
+          onChange={setAsPack}>
+          <Toggle.LabelText>
+            <Trans>Also save as a pack</Trans>
+          </Toggle.LabelText>
+          <Toggle.Platform />
+        </Toggle.Item>
+        {asPack ? (
+          <>
+            <TextField.Root isInvalid={!!packNameError}>
+              <TextField.LabelText>
+                <Trans>Pack name</Trans>
+              </TextField.LabelText>
+              <TextField.Input
+                label={l`Pack name`}
+                placeholder={l`cute cats`}
+                value={packName}
+                onChangeText={setPackName}
+                autoCapitalize="none"
+                autoCorrect={false}
+              />
+            </TextField.Root>
+            {packNameError === 'empty' ? (
+              <AliasProblemText>
+                <Trans>Give the pack a name.</Trans>
+              </AliasProblemText>
+            ) : packNameError ? (
+              <AliasProblemText>
+                <Trans>Use 64 characters or fewer for the name.</Trans>
+              </AliasProblemText>
+            ) : null}
+            <TextField.Root isInvalid={!!packDescriptionError}>
+              <TextField.LabelText>
+                <Trans>Description</Trans>
+              </TextField.LabelText>
+              <TextField.Input
+                label={l`Pack description`}
+                value={packDescription}
+                onChangeText={setPackDescription}
+                multiline
+              />
+            </TextField.Root>
+            {packDescriptionError ? (
+              <AliasProblemText>
+                <Trans>Use 300 characters or fewer for the description.</Trans>
+              </AliasProblemText>
+            ) : null}
+            <Text
+              style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
+              <Trans>
+                The first emoji becomes the pack icon. Only the emoji that saved
+                successfully are added to the pack.
+              </Trans>
+            </Text>
+          </>
+        ) : null}
+
         {rows.map((row, index) => (
           <View key={`${row.image.path}-${index}`} style={[a.gap_2xs]}>
             <TextField.Root isInvalid={!isValidAlias(row.alias)}>
@@ -168,9 +261,13 @@ export function BulkEmojiDialogForm({
 
         {isPending ? (
           <Text style={[a.text_sm, t.atoms.text_contrast_medium]}>
-            <Trans>
-              Adding {done} of {rows.length}…
-            </Trans>
+            {asPack && done >= rows.length ? (
+              <Trans>Creating the pack…</Trans>
+            ) : (
+              <Trans>
+                Adding {done} of {rows.length}…
+              </Trans>
+            )}
           </Text>
         ) : null}
 

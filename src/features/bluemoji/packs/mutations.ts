@@ -7,7 +7,11 @@ import {
   type UriString,
 } from '@atproto/syntax'
 import {useLingui} from '@lingui/react/macro'
-import {useMutation, useQueryClient} from '@tanstack/react-query'
+import {
+  type QueryClient,
+  useMutation,
+  useQueryClient,
+} from '@tanstack/react-query'
 
 import {uploadBlob} from '#/lib/api'
 import {useHaptics} from '#/lib/haptics'
@@ -38,6 +42,7 @@ import {
   getPackRenditionUrl,
   PACK_COLLECTION,
   PACK_ITEM_COLLECTION,
+  packAtUri,
   packRkey,
 } from './util'
 
@@ -51,9 +56,15 @@ export type PackDraft = {
   license?: string
   /** New icon, as returned by the picker. Omitting it keeps the current one. */
   icon?: PickerImage
+  /**
+   * Icon already uploaded to this repo, used instead of `icon`. A bulk upload
+   * points this at the first emoji's rendition, so the pack it creates needs no
+   * second upload.
+   */
+  iconBlob?: blue.moji.packs.pack.Main['icon']
 }
 
-function invalidatePacks(queryClient: ReturnType<typeof useQueryClient>) {
+export function invalidatePacks(queryClient: QueryClient) {
   void queryClient.invalidateQueries({queryKey: [PACKS_ROOT]})
   void queryClient.invalidateQueries({queryKey: [PACK_ROOT]})
   void queryClient.invalidateQueries({queryKey: [PACK_ITEMS_ROOT]})
@@ -66,6 +77,72 @@ function invalidatePacks(queryClient: ReturnType<typeof useQueryClient>) {
  * existing record so a pack another client wrote keeps them instead of losing
  * them to our simpler form.
  */
+export async function writePack(
+  pds: Client,
+  {draft, editing}: {draft: PackDraft; editing?: BluemojiPack},
+) {
+  const name = draft.name.trim()
+  if (getPackNameError(name)) throw new Error('Invalid pack name')
+  const description = draft.description?.trim() || undefined
+  if (getPackDescriptionError(description ?? ''))
+    throw new Error('Invalid pack description')
+  const icon =
+    draft.iconBlob ??
+    (draft.icon
+      ? (await uploadBlob(pds, draft.icon.path, draft.icon.mime)).blob
+      : editing?.record.icon)
+  const previous = editing?.record
+  const record: blue.moji.packs.pack.Main = {
+    $type: PACK_COLLECTION,
+    name,
+    description,
+    descriptionFacets: previous?.descriptionFacets,
+    icon,
+    adultOnly: draft.adultOnly || undefined,
+    // Only a plain http(s) URL is written: the field is a URI and anything
+    // else would either fail the lexicon or render as a dead link.
+    source: getSafeSourceUrl(draft.source) as UriString | undefined,
+    license: draft.license?.trim() || undefined,
+    createdAt: previous?.createdAt ?? toDatetimeString(new Date()),
+    labels: previous?.labels,
+  }
+  const rkey = editing ? packRkey(editing.uri) : TID.nextStr()
+  await pds.call(com.atproto.repo.putRecord, {
+    repo: pds.assertDid,
+    collection: PACK_COLLECTION,
+    rkey,
+    record,
+    // Our PDS does not know this lexicon.
+    validate: false,
+  })
+  return {
+    rkey,
+    uri: packAtUri(pds.assertDid, rkey),
+    created: !editing,
+    name,
+  }
+}
+
+/** One membership record, shared by the pack editor and the bulk upload. */
+export async function writePackItem(
+  pds: Client,
+  packUri: string,
+  subject: string,
+) {
+  await pds.call(com.atproto.repo.putRecord, {
+    repo: pds.assertDid,
+    collection: PACK_ITEM_COLLECTION,
+    rkey: TID.nextStr(),
+    record: {
+      $type: PACK_ITEM_COLLECTION,
+      subject,
+      pack: packUri,
+      createdAt: new Date().toISOString(),
+    },
+    validate: false,
+  })
+}
+
 export function useSavePackMutation() {
   const pds = usePdsClient()
   const queryClient = useQueryClient()
@@ -81,39 +158,7 @@ export function useSavePackMutation() {
       editing?: BluemojiPack
     }) => {
       if (!pds.did) throw new Error('You need to sign in to save a pack')
-      const name = draft.name.trim()
-      if (getPackNameError(name)) throw new Error('Invalid pack name')
-      const description = draft.description?.trim() || undefined
-      if (getPackDescriptionError(description ?? ''))
-        throw new Error('Invalid pack description')
-      const icon = draft.icon
-        ? (await uploadBlob(pds, draft.icon.path, draft.icon.mime)).blob
-        : editing?.record.icon
-      const previous = editing?.record
-      const record: blue.moji.packs.pack.Main = {
-        $type: PACK_COLLECTION,
-        name,
-        description,
-        descriptionFacets: previous?.descriptionFacets,
-        icon,
-        adultOnly: draft.adultOnly || undefined,
-        // Only a plain http(s) URL is written: the field is a URI and anything
-        // else would either fail the lexicon or render as a dead link.
-        source: getSafeSourceUrl(draft.source) as UriString | undefined,
-        license: draft.license?.trim() || undefined,
-        createdAt: previous?.createdAt ?? toDatetimeString(new Date()),
-        labels: previous?.labels,
-      }
-      const rkey = editing ? packRkey(editing.uri) : TID.nextStr()
-      await pds.call(com.atproto.repo.putRecord, {
-        repo: pds.assertDid,
-        collection: PACK_COLLECTION,
-        rkey,
-        record,
-        // Our PDS does not know this lexicon.
-        validate: false,
-      })
-      return {rkey, created: !editing, name}
+      return await writePack(pds, {draft, editing})
     },
     onError: (error, {editing}) => {
       logger.error('Failed to save Bluemoji pack', {safeMessage: error})
@@ -223,18 +268,7 @@ export function useSetPackItemsMutation() {
       for (const item of add) {
         if (existing.has(item.uri)) continue
         existing.add(item.uri)
-        await pds.call(com.atproto.repo.putRecord, {
-          repo: pds.assertDid,
-          collection: PACK_ITEM_COLLECTION,
-          rkey: TID.nextStr(),
-          record: {
-            $type: PACK_ITEM_COLLECTION,
-            subject: item.uri,
-            pack: pack.uri,
-            createdAt: new Date().toISOString(),
-          },
-          validate: false,
-        })
+        await writePackItem(pds, pack.uri, item.uri)
         added++
       }
       return {added, removed: remove.length}

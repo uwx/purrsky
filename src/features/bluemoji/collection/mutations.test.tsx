@@ -5,6 +5,7 @@ import {renderHook} from '@testing-library/react-native'
 
 import {
   ITEM_COLLECTION,
+  useBulkEmojiMutation,
   useDeleteEmojiMutation,
   useSaveEmojiMutation,
 } from '#/features/bluemoji/collection/mutations'
@@ -39,6 +40,13 @@ jest.mock('#/lib/haptics', () => ({
 }))
 jest.mock('#/logger', () => ({logger: {error: jest.fn()}}))
 jest.mock('#/components/Toast', () => ({show: jest.fn()}))
+/*
+ * The pack writers import this via `packs/mutations`, and its real module pulls
+ * in the session agent (and the analytics Logger this file stubs out).
+ */
+jest.mock('#/state/queries/resolve-identity', () => ({
+  resolvePdsServiceUrl: jest.fn(),
+}))
 
 beforeAll(() => {
   const mock = jest.requireMock('#/state/session') as {
@@ -202,4 +210,82 @@ it('clears the licence when asked to', async () => {
   // Absent once serialised, not an empty string: "unspecified" is the absence
   // of a value.
   expect(calls()[0][1].record?.license).toBeUndefined()
+})
+
+it('creates a pack from a bulk upload and adds every written emoji to it', async () => {
+  const queryClient = new QueryClient()
+  const {result} = renderHook(() => useBulkEmojiMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  const image = {path: '/tmp/cat.png', mime: 'image/png'} as never
+  const outcome = await result.current.mutateAsync({
+    drafts: [
+      {alias: ':one:', image, license: 'CC0-1.0'},
+      {alias: ':two:', image, license: 'CC0-1.0'},
+    ],
+    pack: {name: ' cute cats '},
+  })
+
+  expect(outcome).toMatchObject({added: 2, failed: []})
+  expect(outcome.packError).toBeUndefined()
+
+  const collections = calls().map(([, params]) => params.collection)
+  expect(collections).toEqual([
+    ITEM_COLLECTION,
+    ITEM_COLLECTION,
+    'blue.moji.packs.pack',
+    'blue.moji.packs.packitem',
+    'blue.moji.packs.packitem',
+  ])
+
+  const pack = calls()[2][1]
+  expect(pack.record).toMatchObject({
+    $type: 'blue.moji.packs.pack',
+    name: 'cute cats',
+    // The first written emoji's own rendition, so the pack uploads no icon.
+    icon: {ref: {$link: 'bafynew'}},
+  })
+
+  const packUri = `at://did:plc:me/blue.moji.packs.pack/${pack.rkey}`
+  const members = calls()
+    .slice(3)
+    .map(([, params]) => params.record)
+  expect(members).toEqual([
+    expect.objectContaining({
+      pack: packUri,
+      subject: `at://did:plc:me/${ITEM_COLLECTION}/one`,
+    }),
+    expect.objectContaining({
+      pack: packUri,
+      subject: `at://did:plc:me/${ITEM_COLLECTION}/two`,
+    }),
+  ])
+})
+
+it('reports a pack failure without losing the emoji that saved', async () => {
+  const queryClient = new QueryClient()
+  pdsCall.mockImplementation((_def: unknown, params?: CallParams) => {
+    if (params?.collection === 'blue.moji.packs.pack')
+      return Promise.reject(new Error('nope'))
+    return Promise.resolve({})
+  })
+  const {result} = renderHook(() => useBulkEmojiMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  const outcome = await result.current.mutateAsync({
+    drafts: [
+      {alias: ':one:', image: {path: '/tmp/a.png', mime: 'image/png'} as never},
+    ],
+    pack: {name: 'cats'},
+  })
+
+  expect(outcome).toMatchObject({added: 1, failed: [], packError: 'cats'})
+  // No membership is attempted for a pack that was never written.
+  expect(
+    calls().filter(
+      ([, params]) => params.collection === 'blue.moji.packs.packitem',
+    ),
+  ).toHaveLength(0)
 })

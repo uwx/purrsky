@@ -102,9 +102,9 @@ export function CustomEmojiSettingsScreen() {
         <Dialog.Handle />
         <BulkEmojiDialogForm
           isPending={isBulkPending}
-          onSave={(drafts, onProgress) =>
+          onSave={(drafts, onProgress, pack) =>
             bulkSave(
-              {drafts, onProgress},
+              {drafts, onProgress, pack},
               {onSuccess: () => bulkControl.close()},
             )
           }

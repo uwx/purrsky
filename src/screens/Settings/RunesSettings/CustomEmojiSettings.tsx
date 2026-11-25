@@ -238,19 +238,21 @@ function EmojiForm({
           </Button>
         </View>
 
-        <TextField.Root>
+        <View>
           <TextField.LabelText>
             <Trans>Alias</Trans>
           </TextField.LabelText>
-          <TextField.Input
-            label={l`Alias`}
-            placeholder={l`my_emoji`}
-            value={alias}
-            onChangeText={setAlias}
-            autoCapitalize="none"
-            autoCorrect={false}
-          />
-        </TextField.Root>
+          <TextField.Root>
+            <TextField.Input
+              label={l`Alias`}
+              placeholder={l`my_emoji`}
+              value={alias}
+              onChangeText={setAlias}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+          </TextField.Root>
+        </View>
 
         <Text style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
           <Trans>
@@ -260,17 +262,19 @@ function EmojiForm({
           </Trans>
         </Text>
 
-        <TextField.Root>
+        <View>
           <TextField.LabelText>
             <Trans>Description</Trans>
           </TextField.LabelText>
-          <TextField.Input
-            label={l`Description`}
-            placeholder={l`What does this emoji show?`}
-            value={alt}
-            onChangeText={setAlt}
-          />
-        </TextField.Root>
+          <TextField.Root>
+            <TextField.Input
+              label={l`Description`}
+              placeholder={l`What does this emoji show?`}
+              value={alt}
+              onChangeText={setAlt}
+            />
+          </TextField.Root>
+        </View>
 
         <Text style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
           <Trans>
@@ -280,20 +284,22 @@ function EmojiForm({
           </Trans>
         </Text>
 
-        <TextField.Root>
+        <View>
           <TextField.LabelText>
             <Trans>License</Trans>
           </TextField.LabelText>
-          <TextField.Input
-            label={l`License`}
-            placeholder="CC-BY-4.0"
-            value={license}
-            onChangeText={setLicense}
-            maxLength={128}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
-        </TextField.Root>
+          <TextField.Root>
+            <TextField.Input
+              label={l`License`}
+              placeholder="CC-BY-4.0"
+              value={license}
+              onChangeText={setLicense}
+              maxLength={128}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+          </TextField.Root>
+        </View>
 
         <Text style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
           {license.trim() ? (

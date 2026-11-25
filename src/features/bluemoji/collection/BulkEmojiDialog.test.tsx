@@ -1,3 +1,4 @@
+import {type StyleProp, StyleSheet, type ViewStyle} from 'react-native'
 import {i18n} from '@lingui/core'
 import {I18nProvider} from '@lingui/react'
 import {fireEvent, render, screen, waitFor} from '@testing-library/react-native'
@@ -70,6 +71,32 @@ it('hides the pack fields until asked for them', async () => {
   fireEvent.press(screen.getByLabelText('Also save as a pack'))
   expect(screen.getByLabelText('Pack name')).toBeTruthy()
   expect(screen.getByLabelText('Pack description')).toBeTruthy()
+})
+
+/**
+ * `TextField.Root` lays its children out in a row so an icon can sit beside the
+ * input. A label nested in it would be squeezed to the input's left and painted
+ * over by the field chrome, so every label belongs above the Root instead.
+ */
+function expectLabelAboveField(labelText: string) {
+  let node = screen.getByText(labelText).parent
+  while (node) {
+    const style = StyleSheet.flatten(
+      node.props.style as StyleProp<ViewStyle> | undefined,
+    )
+    expect(style?.flexDirection).not.toBe('row')
+    node = node.parent
+  }
+}
+
+it('puts field labels above their fields rather than beside them', async () => {
+  setup()
+  await pickImages()
+  fireEvent.press(screen.getByLabelText('Also save as a pack'))
+
+  expectLabelAboveField('License')
+  expectLabelAboveField('Name')
+  expectLabelAboveField('Description')
 })
 
 it('will not save until the pack has a name', async () => {

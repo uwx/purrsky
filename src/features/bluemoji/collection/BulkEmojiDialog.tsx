@@ -143,20 +143,22 @@ export function BulkEmojiDialogForm({
           </Button>
         </View>
 
-        <TextField.Root>
+        <View>
           <TextField.LabelText>
             <Trans>License</Trans>
           </TextField.LabelText>
-          <TextField.Input
-            label={l`License`}
-            placeholder="CC-BY-4.0"
-            value={license}
-            onChangeText={setLicense}
-            maxLength={128}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
-        </TextField.Root>
+          <TextField.Root>
+            <TextField.Input
+              label={l`License`}
+              placeholder="CC-BY-4.0"
+              value={license}
+              onChangeText={setLicense}
+              maxLength={128}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+          </TextField.Root>
+        </View>
         <Text style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
           {license.trim() && !isCopyableLicense(license) ? (
             <Trans>
@@ -183,18 +185,20 @@ export function BulkEmojiDialogForm({
         </Toggle.Item>
         {asPack ? (
           <>
-            <TextField.Root isInvalid={!!packNameError}>
+            <View>
               <TextField.LabelText>
                 <Trans>Name</Trans>
               </TextField.LabelText>
-              <TextField.Input
-                label={l`Pack name`}
-                placeholder={l`cute cats`}
-                value={packName}
-                onChangeText={setPackName}
-                maxLength={PACK_NAME_MAX_BYTES}
-              />
-            </TextField.Root>
+              <TextField.Root isInvalid={!!packNameError}>
+                <TextField.Input
+                  label={l`Pack name`}
+                  placeholder={l`cute cats`}
+                  value={packName}
+                  onChangeText={setPackName}
+                  maxLength={PACK_NAME_MAX_BYTES}
+                />
+              </TextField.Root>
+            </View>
             {packNameError === 'empty' ? (
               <AliasProblemText>
                 <Trans>Give the pack a name.</Trans>
@@ -204,19 +208,21 @@ export function BulkEmojiDialogForm({
                 <Trans>Pack names are limited to 64 bytes.</Trans>
               </AliasProblemText>
             ) : null}
-            <TextField.Root isInvalid={!!packDescriptionError}>
+            <View>
               <TextField.LabelText>
                 <Trans>Description</Trans>
               </TextField.LabelText>
-              <TextField.Input
-                label={l`Pack description`}
-                placeholder={l`What is in this pack?`}
-                value={packDescription}
-                onChangeText={setPackDescription}
-                multiline
-                numberOfLines={3}
-              />
-            </TextField.Root>
+              <TextField.Root isInvalid={!!packDescriptionError}>
+                <TextField.Input
+                  label={l`Pack description`}
+                  placeholder={l`What is in this pack?`}
+                  value={packDescription}
+                  onChangeText={setPackDescription}
+                  multiline
+                  numberOfLines={3}
+                />
+              </TextField.Root>
+            </View>
             {packDescriptionError ? (
               <AliasProblemText>
                 <Trans>
@@ -237,24 +243,26 @@ export function BulkEmojiDialogForm({
 
         {rows.map((row, index) => (
           <View key={`${row.image.path}-${index}`} style={[a.gap_2xs]}>
-            <TextField.Root isInvalid={!isValidAlias(row.alias)}>
+            <View>
               <TextField.LabelText>
                 {row.image.fileName ?? l`Image`}
               </TextField.LabelText>
-              <TextField.Input
-                label={l`Alias`}
-                value={row.alias}
-                onChangeText={alias =>
-                  setRows(previous =>
-                    previous.map((current, i) =>
-                      i === index ? {...current, alias} : current,
-                    ),
-                  )
-                }
-                autoCapitalize="none"
-                autoCorrect={false}
-              />
-            </TextField.Root>
+              <TextField.Root isInvalid={!isValidAlias(row.alias)}>
+                <TextField.Input
+                  label={l`Alias`}
+                  value={row.alias}
+                  onChangeText={alias =>
+                    setRows(previous =>
+                      previous.map((current, i) =>
+                        i === index ? {...current, alias} : current,
+                      ),
+                    )
+                  }
+                  autoCapitalize="none"
+                  autoCorrect={false}
+                />
+              </TextField.Root>
+            </View>
             {!isValidAlias(row.alias) ? (
               <AliasProblemText>
                 <Trans>Use letters, numbers, and . _ - with no spaces.</Trans>

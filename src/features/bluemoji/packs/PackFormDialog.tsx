@@ -109,37 +109,41 @@ export function PackFormDialog({
           </Button>
         </View>
 
-        <TextField.Root>
+        <View>
           <TextField.LabelText>
             <Trans>Name</Trans>
           </TextField.LabelText>
-          <TextField.Input
-            label={l`Pack name`}
-            placeholder={l`cute cats`}
-            value={name}
-            onChangeText={setName}
-            maxLength={PACK_NAME_MAX_BYTES}
-          />
-        </TextField.Root>
+          <TextField.Root>
+            <TextField.Input
+              label={l`Pack name`}
+              placeholder={l`cute cats`}
+              value={name}
+              onChangeText={setName}
+              maxLength={PACK_NAME_MAX_BYTES}
+            />
+          </TextField.Root>
+        </View>
         {nameError === 'too_long' ? (
           <Text style={[a.text_sm, {color: t.palette.negative_400}]}>
             <Trans>Pack names are limited to 64 bytes.</Trans>
           </Text>
         ) : null}
 
-        <TextField.Root>
+        <View>
           <TextField.LabelText>
             <Trans>Description</Trans>
           </TextField.LabelText>
-          <TextField.Input
-            label={l`Pack description`}
-            placeholder={l`What is in this pack?`}
-            value={description}
-            onChangeText={setDescription}
-            multiline
-            numberOfLines={3}
-          />
-        </TextField.Root>
+          <TextField.Root>
+            <TextField.Input
+              label={l`Pack description`}
+              placeholder={l`What is in this pack?`}
+              value={description}
+              onChangeText={setDescription}
+              multiline
+              numberOfLines={3}
+            />
+          </TextField.Root>
+        </View>
         {descriptionError ? (
           <Text style={[a.text_sm, {color: t.palette.negative_400}]}>
             <Trans>
@@ -149,34 +153,38 @@ export function PackFormDialog({
           </Text>
         ) : null}
 
-        <TextField.Root>
+        <View>
           <TextField.LabelText>
             <Trans>Source</Trans>
           </TextField.LabelText>
-          <TextField.Input
-            label={l`Source URL`}
-            placeholder="https://"
-            value={source}
-            onChangeText={setSource}
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="url"
-          />
-        </TextField.Root>
+          <TextField.Root>
+            <TextField.Input
+              label={l`Source URL`}
+              placeholder="https://"
+              value={source}
+              onChangeText={setSource}
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+            />
+          </TextField.Root>
+        </View>
 
-        <TextField.Root>
+        <View>
           <TextField.LabelText>
             <Trans>License</Trans>
           </TextField.LabelText>
-          <TextField.Input
-            label={l`License`}
-            placeholder="CC-BY-4.0"
-            value={license}
-            onChangeText={setLicense}
-            autoCapitalize="characters"
-            autoCorrect={false}
-          />
-        </TextField.Root>
+          <TextField.Root>
+            <TextField.Input
+              label={l`License`}
+              placeholder="CC-BY-4.0"
+              value={license}
+              onChangeText={setLicense}
+              autoCapitalize="characters"
+              autoCorrect={false}
+            />
+          </TextField.Root>
+        </View>
         <Text style={[a.text_sm, a.leading_snug, t.atoms.text_contrast_medium]}>
           <Trans>
             This describes the pack. Whether someone else may add an emoji to

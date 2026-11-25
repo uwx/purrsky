@@ -43,6 +43,14 @@ allowBuilds:
   'onnxruntime-node': false
   # Downloads ExecuTorch native libs into third-party/ for Android/iOS builds.
   'react-native-executorch': true
+sideEffectsCache:
+  exclude:
+    # download-libs.js writes its output into the package, but what it writes
+    # depends on RNET_SKIP_DOWNLOAD, which the cache key cannot see. The web
+    # workflow sets that variable to skip ~600 MB of libs it never links, so a
+    # cached build from there replays into the native jobs and leaves
+    # third-party/ empty until Gradle fails. Rebuild this package every time.
+    - 'react-native-executorch'
 patchedDependencies:
   '@assembless/react-native-material-you@1.0.0-beta.4': patches/@assembless__react-native-material-you@1.0.0-beta.4.patch
   '@atproto/oauth-client-expo@0.1.12': patches/@atproto__oauth-client-expo@0.1.12.patch

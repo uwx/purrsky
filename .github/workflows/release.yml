@@ -295,6 +295,7 @@ jobs:
     # (react-native.config.js) and keeps the Expo SDK default of 16.4 for
     # devices that stop there. fail-fast is off so one variant failing still
     # produces the other; publish is gated on the aggregate result below.
+    name: ios (${{ matrix.variant }})
     strategy:
       fail-fast: false
       matrix:

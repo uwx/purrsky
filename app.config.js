@@ -478,7 +478,18 @@ module.exports = function (_config) {
           'expo-build-properties',
           {
             ios: {
-              deploymentTarget: '16.4',
+              /*
+               * react-native-executorch (on-device alt text) ships its ExecuTorch
+               * xcframeworks built for iOS 17.0 and declares the same floor in
+               * its podspec, so `pod install` fails on anything lower:
+               *
+               *   Specs satisfying the `react-native-executorch` dependency
+               *   were found, but they required a higher minimum deployment target.
+               *
+               * 17.0 is also what the package documents as its minimum. The
+               * previous 16.4 was simply the Expo SDK default.
+               */
+              deploymentTarget: '17.0',
               buildReactNativeFromSource: true,
               ccacheEnabled: IS_DEV,
               cxxLanguageStandard: 'c++23',

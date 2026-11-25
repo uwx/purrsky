@@ -6,6 +6,7 @@ import {parseCidSafe} from '@atproto/lex'
  */
 jest.unmock('multiformats/cid')
 
+import {AVATAR_SHAPES} from './avatarShapes'
 import {
   buildDecorationRecord,
   getDecorationSettings,
@@ -97,7 +98,7 @@ describe('parseDecorationSettings', () => {
   })
 
   it('accepts every supported avatar shape', () => {
-    for (const shape of ['circle', 'square', 'squircle', 'hexagon']) {
+    for (const shape of AVATAR_SHAPES) {
       expect(parseDecorationSettings({avatarShape: shape})).toEqual({
         avatarShape: shape,
       })

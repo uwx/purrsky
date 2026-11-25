@@ -139,6 +139,21 @@ it.each(['hexagon', 'triangle'] as const)(
   },
 )
 
+it('clips a triangle avatar, not a hexagon', () => {
+  const {getByTestId} = render(
+    <UserAvatar
+      type="user"
+      size={40}
+      avatar={avatar}
+      usePlainRNImage
+      profileShape="triangle"
+    />,
+  )
+
+  // Six corner curves would be a hexagon; a triangle has three.
+  expect(getByTestId('avatarHexagonBorder').props.d.match(/Q/g)).toHaveLength(3)
+})
+
 it('never decorates a blurred avatar', () => {
   const {queryByTestId} = render(
     <UserAvatar

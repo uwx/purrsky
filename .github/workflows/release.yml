@@ -4,7 +4,13 @@ name: Release
 # IPA share a version and land in a single GitHub release.
 #
 #   tag    witchsky-v<N>                 name  Witchsky v<N>
-#   files  witchsky-v<N>.apk, witchsky-v<N>.ipa
+#   files  witchsky-v<N>.apk, witchsky-v<N>.ipa, witchsky-v<N>-ios16.ipa
+#
+# The two IPAs differ only in react-native-executorch: <N>.ipa links it and
+# requires iOS 17.0, <N>-ios16.ipa leaves it out of autolinking so it stays at
+# the Expo SDK default of 16.4 for devices that stop there (and loses on-device
+# alt text, the only thing the package is used for). See react-native.config.js
+# and the `ios` job's matrix.
 #
 # <N> is the next free number in the release list rather than
 # `github.run_number`: this workflow replaces the two per-platform ones, so its
@@ -284,6 +290,23 @@ jobs:
   ios:
     needs: version
     if: inputs.targets != 'android'
+    # Two IPAs from one job: `modern` links react-native-executorch and so
+    # requires iOS 17.0, `legacy` leaves it out of autolinking
+    # (react-native.config.js) and keeps the Expo SDK default of 16.4 for
+    # devices that stop there. fail-fast is off so one variant failing still
+    # produces the other; publish is gated on the aggregate result below.
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - variant: modern
+            legacy: ''
+            suffix: ''
+            artifact: ipa
+          - variant: legacy
+            legacy: '1'
+            suffix: -ios16
+            artifact: ipa-legacy
     # macos-latest is macOS 26 arm64: Xcode 26.6 (iOS 26.5 SDK), CocoaPods
     # 1.17 and Ruby 3.4 preinstalled. React Native is compiled from source
     # (expo-build-properties buildReactNativeFromSource), which is the bulk of
@@ -299,6 +322,10 @@ jobs:
       EXPO_PUBLIC_APP_NAME: ${{ vars.APP_NAME || 'Purrsky' }}
       EXPO_PUBLIC_SENTRY_DSN: ${{ vars.SENTRY_DSN }}
       EXPO_PUBLIC_BUNDLE_IDENTIFIER: ${{ github.sha }}
+      # Read by app.config.js (deployment target), react-native.config.js
+      # (whether react-native-executorch is autolinked) and the app itself
+      # (whether on-device alt text is offered). Empty for the modern build.
+      EXPO_PUBLIC_LEGACY_IOS: ${{ matrix.legacy }}
       # app.config.js also reads this for the icon choice: only `ios` gets the
       # .icon (Icon Composer) asset, and only `ios` gets the .aiff notification
       # sound. Must be set before prebuild, which consumes the config.
@@ -380,19 +407,25 @@ jobs:
       # Compiler results only: they are keyed by content, so a regenerated
       # project (new UUIDs, new paths) still hits, and a stale cache can only
       # cost a rebuild. A new key per run means this run's results get saved;
-      # restore-keys always take the newest.
+      # restore-keys always take the newest. The variant is in the key because
+      # the two builds compile the same sources at different deployment
+      # targets, so their objects never match each other.
       - name: Restore ccache
         uses: actions/cache@v6
         with:
           path: .ccache
-          key: ios-ccache-${{ hashFiles('pnpm-lock.yaml', 'patches/**') }}-${{ github.run_number }}
+          key: ios-ccache-${{ matrix.variant }}-${{ hashFiles('pnpm-lock.yaml', 'patches/**') }}-${{ github.run_number }}
           restore-keys: |
-            ios-ccache-${{ hashFiles('pnpm-lock.yaml', 'patches/**') }}-
+            ios-ccache-${{ matrix.variant }}-${{ hashFiles('pnpm-lock.yaml', 'patches/**') }}-
+            ios-ccache-${{ matrix.variant }}-
             ios-ccache-
 
       # Pod sources and the CDN spec shards, plus the React Native tarball
       # cache its download helpers keep in ~/Library/Caches/ReactNative. Pure
-      # downloads, so a stale entry can only mean a re-download.
+      # downloads, so a stale entry can only mean a re-download. Each variant
+      # saves under its own key so the two legs cannot fight over one entry;
+      # the shared `ios-pods-` prefix still lets the legacy leg restore the
+      # modern leg's downloads, which differ only by the executorch pods.
       - name: Restore CocoaPods caches
         uses: actions/cache@v6
         with:
@@ -400,7 +433,7 @@ jobs:
             ~/.cocoapods
             ~/Library/Caches/CocoaPods
             ~/Library/Caches/ReactNative
-          key: ios-pods-${{ hashFiles('pnpm-lock.yaml', 'patches/**', 'app.config.js') }}
+          key: ios-pods-${{ matrix.variant }}-${{ hashFiles('pnpm-lock.yaml', 'patches/**', 'app.config.js') }}
           restore-keys: |
             ios-pods-
 
@@ -444,6 +477,22 @@ jobs:
       - name: Install CocoaPods dependencies
         working-directory: ios
         run: pod install
+
+      # The legacy build's whole point is that react-native-executorch is not
+      # linked, and the modern one's that it is. If the autolinking exclusion in
+      # react-native.config.js ever stops being read, this fails here instead of
+      # producing a mislabelled IPA - the legacy one would silently require
+      # iOS 17 (its podspec floor) and the modern one would have no on-device alt
+      # text.
+      - name: Check the executorch pod matches the variant
+        run: |
+          if grep -q react-native-executorch ios/Podfile.lock; then linked=1; else linked=0; fi
+          echo "legacy=${{ matrix.legacy }} executorch_linked=$linked"
+          if [ "${{ matrix.legacy }}" = "1" ]; then
+            test "$linked" = 0
+          else
+            test "$linked" = 1
+          fi
 
       # `pod install` writes .xcode.env.local with the absolute path of the node
       # it found, and Xcode's script phases source it. It is the only thing
@@ -554,7 +603,7 @@ jobs:
           test -d "$app"
           mkdir -p build/Payload
           ditto "$app" "build/Payload/$(basename "$app")"
-          ipa="build/witchsky-v${{ needs.version.outputs.number }}.ipa"
+          ipa="build/witchsky-v${{ needs.version.outputs.number }}${{ matrix.suffix }}.ipa"
           (cd build && zip -qry -X "$(basename "$ipa")" Payload)
           # The bundle lives at the app root; its absence means the Metro phase
           # was skipped and the build is not installable.
@@ -565,20 +614,26 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: ipa
+          name: ${{ matrix.artifact }}
           if-no-files-found: error
-          path: build/witchsky-v${{ needs.version.outputs.number }}.ipa
+          path: build/witchsky-v${{ needs.version.outputs.number }}${{ matrix.suffix }}.ipa
 
   # One release for both platforms. A job rather than a step in each build so
   # the two uploads cannot race on tag creation, and `if: always()` keeps a
   # failing platform from taking the other one down: the artifacts that did get
   # built are still published under that version.
+  #
+  # The iOS job is a two-leg matrix, and `needs.ios.result` is `failure` when
+  # only one leg built - so it is deliberately not part of the condition here.
+  # The legacy IPA is the fallback for devices the modern one cannot run on, so
+  # requiring both legs would withhold exactly the artifact that survived. The
+  # step after the download fails the job when no binary came through at all,
+  # which is the only case where there is nothing to publish.
   publish:
     needs: [version, android, ios]
     if: >-
       always() && !cancelled() && github.ref_name == 'main' &&
-      needs.version.result == 'success' &&
-      (needs.android.result == 'success' || needs.ios.result == 'success')
+      needs.version.result == 'success'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -591,7 +646,11 @@ jobs:
           merge-multiple: true
 
       - name: List release files
-        run: ls -lh dist
+        run: |
+          ls -lh dist
+          # An artifact-less release would create the tag for the next run to
+          # skip past, so an empty dist stops here instead.
+          test -n "$(ls -A dist)"
 
       - name: Publish release
         uses: softprops/action-gh-release@v3
@@ -599,11 +658,17 @@ jobs:
           name: Witchsky v${{ needs.version.outputs.number }}
           tag_name: witchsky-v${{ needs.version.outputs.number }}
           body: |
-            Android APK and unsigned iOS IPA built from the same commit.
+            Android APK and two unsigned iOS IPAs built from the same commit.
 
-            The IPA is not signed and carries no entitlements. Re-sign it with
+            `witchsky-v${{ needs.version.outputs.number }}.ipa` requires iOS 17
+            and includes on-device alt text generation.
+            `witchsky-v${{ needs.version.outputs.number }}-ios16.ipa` runs on
+            iOS 16.4 and later but has no on-device alt text; hosted providers
+            still work there.
+
+            Neither IPA is signed or carries entitlements. Re-sign with
             Sideloadly, AltStore/SideStore or TrollStore before installing;
-            only a jailbroken device takes it as-is.
+            only a jailbroken device takes one as-is.
           files: |
             dist/*.apk
             dist/*.ipa

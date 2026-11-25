@@ -34,7 +34,7 @@ import * as Layout from '#/components/Layout'
 import {InlineLinkText} from '#/components/Link'
 import * as Select from '#/components/Select'
 import {Text} from '#/components/Typography'
-import {IS_WEB} from '#/env'
+import {IS_LEGACY_IOS, IS_WEB} from '#/env'
 
 type Props = NativeStackScreenProps<CommonNavigatorParams, 'AltTextAiSettings'>
 
@@ -104,10 +104,17 @@ export function AltTextAiSettingsScreen({}: Props) {
           {provider === 'none' ? (
             <SettingsList.Item>
               <Admonition type="info" style={[a.flex_1]}>
-                <Trans>
-                  No hosted provider is selected. Alt text can still be
-                  generated on this device.
-                </Trans>
+                {IS_LEGACY_IOS ? (
+                  <Trans>
+                    No hosted provider is selected. This build cannot generate
+                    alt text on the device, so select one to generate it.
+                  </Trans>
+                ) : (
+                  <Trans>
+                    No hosted provider is selected. Alt text can still be
+                    generated on this device.
+                  </Trans>
+                )}
               </Admonition>
             </SettingsList.Item>
           ) : (
@@ -198,20 +205,24 @@ export function AltTextAiSettingsScreen({}: Props) {
             </>
           )}
 
-          <SettingsList.Divider />
+          {!IS_LEGACY_IOS && (
+            <>
+              <SettingsList.Divider />
 
-          <Toggle.Item
-            name="local_alt_text"
-            label={l`Generate alt text on this device`}
-            value={localAltTextEnabled}
-            onChange={setLocalAltTextEnabled}>
-            <SettingsList.Item>
-              <SettingsList.ItemText>
-                <Trans>Generate alt text on this device</Trans>
-              </SettingsList.ItemText>
-              <Toggle.Platform />
-            </SettingsList.Item>
-          </Toggle.Item>
+              <Toggle.Item
+                name="local_alt_text"
+                label={l`Generate alt text on this device`}
+                value={localAltTextEnabled}
+                onChange={setLocalAltTextEnabled}>
+                <SettingsList.Item>
+                  <SettingsList.ItemText>
+                    <Trans>Generate alt text on this device</Trans>
+                  </SettingsList.ItemText>
+                  <Toggle.Platform />
+                </SettingsList.Item>
+              </Toggle.Item>
+            </>
+          )}
 
           {localAltTextEnabled && (
             <SettingsList.Item>

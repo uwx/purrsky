@@ -73,6 +73,13 @@ export const LOG_LEVEL = (process.env.EXPO_PUBLIC_LOG_LEVEL || 'info') as
 export const LOG_DEBUG: string = process.env.EXPO_PUBLIC_LOG_DEBUG || ''
 
 /**
+ * This is the iOS 16 build, whose native project has no
+ * react-native-executorch, so on-device alt text cannot run. Anything that
+ * would call into it has to be hidden.
+ */
+export const IS_LEGACY_IOS: boolean = process.env.EXPO_PUBLIC_LEGACY_IOS === '1'
+
+/**
  * The DID of the Bluesky appview to proxy to
  */
 export const BLUESKY_PROXY_DID: DidString =

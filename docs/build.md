@@ -86,21 +86,26 @@ After you do `pnpm ios` and `pnpm android` once, you can later just run `pnpm we
 
 ### App releases without a Mac
 
-`.github/workflows/release.yml` builds the Android APK on `ubuntu-latest` and the unsigned iOS IPA on `macos-latest` in the same run, then publishes both from one job:
+`.github/workflows/release.yml` builds the Android APK on `ubuntu-latest` and two unsigned iOS IPAs on `macos-latest` in the same run, then publishes them from one job:
 
 ```
 tag    witchsky-v<N>
-files  witchsky-v<N>.apk     (arm)
-       witchsky-v<N>.ipa     (unsigned, device)
+files  witchsky-v<N>.apk         (arm)
+       witchsky-v<N>.ipa         (unsigned, iOS 17, device)
+       witchsky-v<N>-ios16.ipa   (unsigned, iOS 16, no on-device alt text)
 ```
 
-`<N>` is one past the highest published `witchsky-v<N>` release, not `github.run_number`, so the series continues across workflow rewrites and a run that publishes nothing cannot consume a number. Both binaries get the same number as their version code / build number. A `workflow_dispatch` with `targets: android` or `targets: ios` builds and publishes just that platform; `architectures` limits the APK ABIs.
+`<N>` is one past the highest published `witchsky-v<N>` release, not `github.run_number`, so the series continues across workflow rewrites and a run that publishes nothing cannot consume a number. Every binary gets the same number as its version code / build number. A `workflow_dispatch` with `targets: android` or `targets: ios` builds and publishes just that platform; `architectures` limits the APK ABIs.
 
-There are no Apple credentials in CI, so nothing is signed and no entitlements are applied - not the app groups, push notifications, or the App Clip. Re-sign the IPA with Sideloadly, AltStore/SideStore, or TrollStore before installing; only a jailbroken device takes it as-is. Re-signing with a certificate that supports those capabilities restores them.
+There are no Apple credentials in CI, so nothing is signed and no entitlements are applied - not the app groups, push notifications, or the App Clip. Re-sign an IPA with Sideloadly, AltStore/SideStore, or TrollStore before installing; only a jailbroken device takes one as-is. Re-signing with a certificate that supports those capabilities restores them.
 
 Two optional repository variables change the iOS build without a code change: `WITCHSKY_BUNDLE_ID` (default `app.witchsky`) picks the bundle identifier, so a build can sit next to an App Store install, and `WITCHSKY_APPLE_TEAM_ID` sets `DEVELOPMENT_TEAM`.
 
 The IPA installs on iOS 17.0 and later. `react-native-executorch` (on-device alt text) ships ExecuTorch xcframeworks whose every slice is built for iOS 17.0 - `ExecutorchLib`, `CoreMLBackend`, `XnnpackBackend`, `MLXBackend` and the `libthreadpool` archives - and its podspec declares that same floor, so `ios.deploymentTarget` in `app.config.js` is 17.0 rather than the Expo SDK 58 default of 16.4; anything lower fails `pod install` with "required a higher minimum deployment target". This drops the devices that cap at iOS 16: iPhone 8, 8 Plus and X, plus the 5th-generation iPad and the first iPad Pro. Lowering it again means rebuilding ExecuTorch and its backends from source, because neither the number in the podspec nor the vendored binaries can be moved down on their own.
+
+`witchsky-v<N>-ios16.ipa` is the build for those devices. The `ios` job is a two-leg matrix and the legacy leg sets `EXPO_PUBLIC_LEGACY_IOS=1`, which changes two things. `react-native.config.js` returns `{platforms: {ios: null}}` for `react-native-executorch`, so the Expo autolinker reports no config for it and `use_native_modules!` never writes the pod; nothing else in the tree declares more than 16.4 (`BottomSheet` and `ExpoDomWebView` are the highest), so `deploymentTarget` stays at the Expo default. And the app reads the same variable as `IS_LEGACY_IOS` to hide the on-device toggle and the composer button, rather than offering a call into a module that is not there. Android is untouched, so the flag cannot change an Android build. A step after `pod install` asserts `Podfile.lock` matches the leg, which fails the run rather than shipping a mislabelled IPA if the exclusion ever stops being read.
+
+The legacy IPA has no on-device alt text; a hosted provider still generates it. The variant exists only until upstream drops iOS 16 - delete the matrix leg and this paragraph when it does.
 
 Both platforms compile React Native from source (`buildReactNativeFromSource`), which is the bulk of the runtime. The iOS job deletes the unused Xcode installs and simulator runtimes first to make room on the runner disk. Xcode 26 ships the iOS platform as a downloadable component and some `macos-26-arm64` image instances come up without it, so the job probes `xcodebuild -showdestinations` and runs `xcodebuild -downloadPlatform iOS` when no device destination resolves. Every run restores and saves these caches:
 

@@ -2,6 +2,7 @@ import {createContext, useContext, useEffect, useState} from 'react'
 
 import * as persisted from '#/state/persisted'
 import {useAltTextAiConfigured} from '#/state/preferences/openrouter'
+import {IS_LEGACY_IOS} from '#/env'
 
 const stateContext = createContext(false)
 const setContext = createContext<(value: boolean) => void>(() => {})
@@ -10,6 +11,10 @@ const setContext = createContext<(value: boolean) => void>(() => {})
  * Whether the composer offers on-device alt text generation. An unset
  * preference follows the hosted provider: without one, on-device is the only
  * way to generate, so it stays on until the user turns it off.
+ *
+ * The iOS 16 build has no react-native-executorch to call, so it is always
+ * off there. The stored preference is left alone, so a device that installed
+ * both builds keeps its choice.
  */
 export function Provider({children}: {children: React.ReactNode}) {
   const [state, setState] = useState(persisted.get('localAltTextEnabled'))
@@ -27,7 +32,8 @@ export function Provider({children}: {children: React.ReactNode}) {
   }, [])
 
   return (
-    <stateContext.Provider value={state ?? !aiConfigured}>
+    <stateContext.Provider
+      value={IS_LEGACY_IOS ? false : (state ?? !aiConfigured)}>
       <setContext.Provider value={setStateWrapped}>
         {children}
       </setContext.Provider>

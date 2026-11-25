@@ -24,6 +24,14 @@ module.exports = function (_config) {
   const IS_E2E = process.env.EXPO_PUBLIC_ENV === 'e2e'
   const IS_DEV = !IS_TESTFLIGHT && !IS_PRODUCTION
 
+  /*
+   * The second iOS IPA in each release, for devices that stop at iOS 16.
+   * `react-native.config.js` drops react-native-executorch from iOS
+   * autolinking when this is set, so the 17.0 floor below is not in effect;
+   * the app also hides on-device alt text. See docs/build.md.
+   */
+  const IS_LEGACY_IOS = process.env.EXPO_PUBLIC_LEGACY_IOS === '1'
+
   const ASSOCIATED_DOMAINS = [
     'applinks:witchsky.app',
     'applinks:deer.social',
@@ -488,8 +496,12 @@ module.exports = function (_config) {
                *
                * 17.0 is also what the package documents as its minimum. The
                * previous 16.4 was simply the Expo SDK default.
+               *
+               * The legacy iOS build leaves the package out of the podfile
+               * entirely (`react-native.config.js`), so it stays on 16.4 - the
+               * floor of every other pod in the tree.
                */
-              deploymentTarget: '17.0',
+              deploymentTarget: IS_LEGACY_IOS ? '16.4' : '17.0',
               buildReactNativeFromSource: true,
               ccacheEnabled: IS_DEV,
               cxxLanguageStandard: 'c++23',

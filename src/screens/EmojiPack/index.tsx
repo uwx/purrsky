@@ -30,10 +30,8 @@ import * as Prompt from '#/components/Prompt'
 import {RichText} from '#/components/RichText'
 import {Text} from '#/components/Typography'
 import {BluemojiDetails} from '#/features/bluemoji/BluemojiDetails'
-import {
-  useCopyPackToCollectionMutation,
-  useDeletePackMutation,
-} from '#/features/bluemoji/packs/mutations'
+import {DeletePackPrompt} from '#/features/bluemoji/packs/DeletePackPrompt'
+import {useCopyPackToCollectionMutation} from '#/features/bluemoji/packs/mutations'
 import {PackFormDialog} from '#/features/bluemoji/packs/PackFormDialog'
 import {PackItemsDialog} from '#/features/bluemoji/packs/PackItemsDialog'
 import {
@@ -75,7 +73,6 @@ export function EmojiPackScreen({route, navigation}: Props) {
   const deletePrompt = Prompt.usePromptControl()
   const [editing, setEditing] = useState(false)
   const [details, setDetails] = useState<BluemojiItem | null>(null)
-  const {mutate: deletePack} = useDeletePackMutation()
   const copy = useCopyPackToCollectionMutation()
   const [progress, setProgress] = useState(0)
 
@@ -381,17 +378,11 @@ export function EmojiPackScreen({route, navigation}: Props) {
               </Dialog.ScrollableInner>
             ) : null}
           </Dialog.Outer>
-          <Prompt.Basic
+          <DeletePackPrompt
             control={deletePrompt}
-            title={l`Delete this pack?`}
-            description={l`The pack stops existing. The emoji in it stay in your collection.`}
-            confirmButtonCta={l`Delete`}
-            confirmButtonColor="negative"
-            onConfirm={() =>
-              deletePack(pack, {
-                onSuccess: () => navigation.goBack(),
-              })
-            }
+            pack={pack}
+            emojiCount={memberships.length}
+            onDeleted={() => navigation.goBack()}
           />
         </>
       ) : null}

@@ -195,7 +195,7 @@ it('deletes the memberships before the pack record', async () => {
     wrapper: setup(queryClient),
   })
 
-  await result.current.mutateAsync(pack)
+  await result.current.mutateAsync({pack})
 
   const deletions = calls().filter(
     ([def]) => def.$nsid === 'com.atproto.repo.deleteRecord',
@@ -209,4 +209,94 @@ it('deletes the memberships before the pack record', async () => {
     collection: PACK_COLLECTION,
     rkey: '3kpack',
   })
+})
+
+function membership(packUri: string, rkey: string, subject: string) {
+  return {
+    uri: `at://did:plc:me/${PACK_ITEM_COLLECTION}/${rkey}`,
+    value: {
+      $type: PACK_ITEM_COLLECTION,
+      pack: packUri,
+      subject,
+      createdAt: '2026-01-01T00:00:00.000Z',
+    },
+  }
+}
+
+const itemUri = (rkey: string) => `at://did:plc:me/${ITEM_COLLECTION}/${rkey}`
+
+it('deletes the collection items too, after their memberships', async () => {
+  listRecords([
+    membership(pack.uri, '3kone', itemUri('one')),
+    membership(pack.uri, '3ktwo', itemUri('two')),
+  ])
+
+  const queryClient = new QueryClient()
+  const {result} = renderHook(() => useDeletePackMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  const summary = await result.current.mutateAsync({pack, deleteItems: true})
+
+  const deletions = calls()
+    .filter(([def]) => def.$nsid === 'com.atproto.repo.deleteRecord')
+    .map(([, params]) => `${String(params.collection)}/${String(params.rkey)}`)
+  expect(deletions).toEqual([
+    `${PACK_ITEM_COLLECTION}/3kone`,
+    `${PACK_ITEM_COLLECTION}/3ktwo`,
+    `${ITEM_COLLECTION}/one`,
+    `${ITEM_COLLECTION}/two`,
+    `${PACK_COLLECTION}/3kpack`,
+  ])
+  expect(summary).toEqual({name: 'cats', deletedItems: 2, keptItems: 0})
+})
+
+it('keeps an emoji another pack still includes', async () => {
+  const otherPack = 'at://did:plc:me/blue.moji.packs.pack/3kother'
+  listRecords([
+    membership(pack.uri, '3kone', itemUri('one')),
+    membership(otherPack, '3kshared', itemUri('one')),
+  ])
+
+  const queryClient = new QueryClient()
+  const {result} = renderHook(() => useDeletePackMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  const summary = await result.current.mutateAsync({pack, deleteItems: true})
+
+  const deletions = calls()
+    .filter(([def]) => def.$nsid === 'com.atproto.repo.deleteRecord')
+    .map(([, params]) => `${String(params.collection)}/${String(params.rkey)}`)
+  expect(deletions).toEqual([
+    `${PACK_ITEM_COLLECTION}/3kone`,
+    `${PACK_COLLECTION}/3kpack`,
+  ])
+  expect(summary).toEqual({name: 'cats', deletedItems: 0, keptItems: 1})
+})
+
+it('never deletes an item that lives in another repo', async () => {
+  // A membership may point at an emoji some other account owns; only records
+  // in our own repo are ours to delete.
+  listRecords([
+    membership(
+      pack.uri,
+      '3kone',
+      'at://did:plc:other/blue.moji.collection.item/theirs',
+    ),
+  ])
+
+  const queryClient = new QueryClient()
+  const {result} = renderHook(() => useDeletePackMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  const summary = await result.current.mutateAsync({pack, deleteItems: true})
+
+  expect(
+    writesTo(ITEM_COLLECTION).filter(
+      ([def]) => def.$nsid === 'com.atproto.repo.deleteRecord',
+    ),
+  ).toHaveLength(0)
+  expect(summary).toEqual({name: 'cats', deletedItems: 0, keptItems: 1})
 })

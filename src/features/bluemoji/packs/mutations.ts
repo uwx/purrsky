@@ -187,37 +187,99 @@ export function useDeletePackMutation() {
   const {t: l} = useLingui()
 
   return useMutation({
-    mutationFn: async (pack: BluemojiPack) => {
+    mutationFn: async ({
+      pack,
+      deleteItems = false,
+    }: {
+      pack: BluemojiPack
+      /** Also delete the emoji only this pack uses, from the collection. */
+      deleteItems?: boolean
+    }) => {
       const rkey = packRkey(pack.uri)
       if (!rkey) throw new Error('Not a pack record')
-      for (const item of await fetchPackItemUris(pds, pack.uri)) {
+      const memberships = await fetchPackItemRecords(pds)
+      const own = memberships.filter(item => item.pack === pack.uri)
+      for (const item of own) {
         await pds.call(com.atproto.repo.deleteRecord, {
           repo: pds.assertDid,
           collection: PACK_ITEM_COLLECTION,
-          rkey: new AtUri(item).rkey,
+          rkey: new AtUri(item.uri).rkey,
         })
+      }
+      let deletedItems = 0
+      let keptItems = 0
+      if (deleteItems) {
+        /*
+         * An emoji another pack also includes stays in the collection: deleting
+         * it would empty that pack, which the user did not ask for.
+         */
+        const shared = new Set(
+          memberships
+            .filter(item => item.pack !== pack.uri)
+            .map(item => item.subject),
+        )
+        for (const subject of new Set(own.map(item => item.subject))) {
+          const uri = toOwnItemUri(subject, pds.assertDid)
+          if (!uri || shared.has(subject)) {
+            keptItems++
+            continue
+          }
+          await pds.call(com.atproto.repo.deleteRecord, {
+            repo: pds.assertDid,
+            collection: ITEM_COLLECTION,
+            rkey: uri.rkey,
+          })
+          deletedItems++
+        }
       }
       await pds.call(com.atproto.repo.deleteRecord, {
         repo: pds.assertDid,
         collection: PACK_COLLECTION,
         rkey,
       })
-      return pack.record.name
+      return {name: pack.record.name, deletedItems, keptItems}
     },
     onError: error => {
       logger.error('Failed to delete Bluemoji pack', {safeMessage: error})
       Toast.show(l`Could not delete your pack`, {type: 'error'})
     },
-    onSuccess: name => {
+    onSuccess: ({name, deletedItems, keptItems}) => {
       haptics.tap()
-      Toast.show(l`Deleted ${name}.`)
+      if (!deletedItems) {
+        Toast.show(l`Deleted ${name}.`)
+      } else {
+        Toast.show(
+          keptItems
+            ? l`Deleted ${name} and ${deletedItems} emoji. ${keptItems} that other packs share stayed in your collection.`
+            : l`Deleted ${name} and ${deletedItems} emoji.`,
+        )
+      }
+      if (deletedItems) {
+        void queryClient.invalidateQueries({queryKey: [OWN_COLLECTION_ROOT]})
+        void queryClient.invalidateQueries({
+          queryKey: ['useBluemojiSearchQuery'],
+        })
+        void queryClient.invalidateQueries({queryKey: ['useBluemojiItemQuery']})
+      }
       invalidatePacks(queryClient)
     },
   })
 }
 
-async function fetchPackItemUris(pds: Client, packUri: string) {
-  const uris: string[] = []
+/** The item a membership points at, when it is one of our own collection items. */
+function toOwnItemUri(subject: string, did: string) {
+  try {
+    const uri = new AtUri(subject)
+    if (uri.host !== did || uri.collection !== ITEM_COLLECTION) return null
+    return uri
+  } catch {
+    return null
+  }
+}
+
+/** Every membership record in the repo, with the item each one points at. */
+async function fetchPackItemRecords(pds: Client) {
+  const records: {uri: string; pack: string; subject: string}[] = []
   let cursor: string | undefined
   do {
     const page = await pds.call(com.atproto.repo.listRecords, {
@@ -228,12 +290,16 @@ async function fetchPackItemUris(pds: Client, packUri: string) {
     })
     for (const record of page.records) {
       const value = blue.moji.packs.packitem.$ifMatches(record.value)
-      if (!value || value.pack !== packUri) continue
-      uris.push(record.uri)
+      if (!value) continue
+      records.push({
+        uri: record.uri,
+        pack: value.pack,
+        subject: value.subject,
+      })
     }
     cursor = page.cursor
   } while (cursor)
-  return uris
+  return records
 }
 
 /** Adds and removes emoji in one pass. */

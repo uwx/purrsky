@@ -14,7 +14,7 @@ import {Trash_Stroke2_Corner0_Rounded as TrashIcon} from '#/components/icons/Tra
 import * as Menu from '#/components/Menu'
 import * as Prompt from '#/components/Prompt'
 import {Text} from '#/components/Typography'
-import {useDeletePackMutation} from './mutations'
+import {DeletePackPrompt} from './DeletePackPrompt'
 import {PackCard} from './PackCard'
 import {PackFormDialog} from './PackFormDialog'
 import {useOwnPacksQuery} from './queries'
@@ -32,7 +32,6 @@ export function PacksSection() {
   const formControl = Dialog.useDialogControl()
   const deletePrompt = Prompt.usePromptControl()
   const [editing, setEditing] = useState<BluemojiPack | undefined>()
-  const {mutate: deletePack} = useDeletePackMutation()
 
   const packs = data?.packs ?? []
   const counts = data?.counts ?? {}
@@ -142,20 +141,11 @@ export function PacksSection() {
         />
       </Dialog.Outer>
 
-      <Prompt.Basic
+      <DeletePackPrompt
         control={deletePrompt}
-        title={l`Delete this pack?`}
-        description={
-          editing
-            ? l`${editing.record.name} stops existing. The emoji in it stay in your collection.`
-            : undefined
-        }
-        confirmButtonCta={l`Delete`}
-        confirmButtonColor="negative"
-        onConfirm={() => {
-          if (editing) deletePack(editing)
-          setEditing(undefined)
-        }}
+        pack={editing}
+        emojiCount={editing ? (counts[editing.uri] ?? 0) : undefined}
+        onDeleted={() => setEditing(undefined)}
       />
     </View>
   )

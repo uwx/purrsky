@@ -46,3 +46,40 @@ it('gives every mounted avatar its own clip id', () => {
     )
   }
 })
+
+/*
+ * The stroke is a second copy of the path. If `shape` only reached the clip,
+ * a triangle image would sit under a hexagon border.
+ */
+it('clips and strokes a triangle on the triangle path', () => {
+  const container = renderInto(
+    <>
+      <HexagonAvatar
+        uri="hex.png"
+        size={80}
+        rounded
+        stroke="#FFD700"
+        strokeWidth={2}
+      />
+      <HexagonAvatar
+        uri="tri.png"
+        size={80}
+        rounded
+        shape="triangle"
+        stroke="#FFD700"
+        strokeWidth={2}
+      />
+    </>,
+  )
+
+  /* Each avatar draws the clip path, then the stroke path inset by half the
+   * stroke width. A triangle is three vertices, so three corner curves. */
+  const quads = Array.from(container.querySelectorAll('svg')).map(svg =>
+    Array.from(svg.querySelectorAll('path')).map(
+      path => path.getAttribute('d')?.match(/Q/g)?.length,
+    ),
+  )
+
+  expect(quads[0]).toEqual([6, 6])
+  expect(quads[1]).toEqual([3, 3])
+})

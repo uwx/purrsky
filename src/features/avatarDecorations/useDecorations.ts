@@ -152,7 +152,7 @@ export function useAnimatedAvatarBlob(
   blob: BlobRef | undefined,
   preset: ImgproxyPreset = 'avatar',
   /**
-   * False when this renderer cannot show motion (a hexagon clip, a tiny
+   * False when this renderer cannot show motion (a polygon clip, a tiny
    * avatar), so no PDS lookup is made for bytes that would never play.
    */
   playable = true,

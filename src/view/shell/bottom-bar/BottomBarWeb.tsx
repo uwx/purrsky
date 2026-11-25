@@ -110,7 +110,7 @@ export function BottomBarWeb() {
   const {
     shape: avatarShape,
     radius: avatarRadius,
-    hexagon: avatarIsHexagon,
+    polygon: avatarIsPolygon,
   } = resolveAvatarShape({
     size: avatarSize,
     type: isLabeler ? 'labeler' : 'user',
@@ -267,7 +267,7 @@ export function BottomBarWeb() {
                         style={[
                           styles.ctrlIcon,
                           {
-                            // A hexagon cannot take a rounded-rect ring, so
+                            // A polygon cannot take a rounded-rect ring, so
                             // the active ring around it is a circle.
                             borderWidth: isActive ? 2 : 1,
                             borderColor: isActive
@@ -277,7 +277,7 @@ export function BottomBarWeb() {
                             // circle is a clamp, and sharp avatars have no
                             // rounding to follow.
                             borderRadius:
-                              avatarIsHexagon || avatarShape === 'circle'
+                              avatarIsPolygon || avatarShape === 'circle'
                                 ? 100
                                 : avatarShape === 'sharp'
                                   ? 0

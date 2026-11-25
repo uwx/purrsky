@@ -1,10 +1,10 @@
 import {useId} from 'react'
 import Svg, {ClipPath, Defs, Image as SvgImage, Path} from 'react-native-svg'
 
-import {hexagonPath} from './avatarShapes'
+import {hexagonPath, trianglePath} from './avatarShapes'
 
 /**
- * Hexagon avatar rendered as an SVG clip so it works identically on web and
+ * Polygon avatar rendered as an SVG clip so it works identically on web and
  * native without a masked-view native module. The stroke is drawn on the same
  * path, inset by half the stroke width so it stays inside the avatar bounds.
  *
@@ -12,7 +12,7 @@ import {hexagonPath} from './avatarShapes'
  * `url(#id)` to the first matching element in document order, so a shared id
  * can point at a clipPath inside a hidden subtree (an inactive screen, a
  * virtualized-off row). That reference resolves to nothing, and the image then
- * paints unclipped - a plain rectangle under the hexagon stroke.
+ * paints unclipped - a plain rectangle under the polygon stroke.
  */
 export function HexagonAvatar({
   uri,
@@ -20,6 +20,7 @@ export function HexagonAvatar({
   rounded,
   stroke,
   strokeWidth,
+  shape = 'hexagon',
   testID,
 }: {
   uri: string
@@ -28,16 +29,19 @@ export function HexagonAvatar({
   /** Border, decoration frame, or live color. */
   stroke?: string
   strokeWidth?: number
+  /** Which polygon clips the image. */
+  shape?: 'hexagon' | 'triangle'
   testID?: string
 }) {
   // useId returns the same value on every render and differs per instance.
   // Strip the punctuation React puts in it so the fragment stays URL-safe.
-  const clipId = `avatar-hexagon-${useId().replace(/[^\w-]/g, '')}`
+  const clipId = `avatar-polygon-${useId().replace(/[^\w-]/g, '')}`
+  const path = shape === 'triangle' ? trianglePath : hexagonPath
   return (
     <Svg width={size} height={size} testID={testID}>
       <Defs>
         <ClipPath id={clipId}>
-          <Path d={hexagonPath(size, rounded)} />
+          <Path d={path(size, rounded)} />
         </ClipPath>
       </Defs>
       <SvgImage
@@ -52,7 +56,7 @@ export function HexagonAvatar({
       {stroke && strokeWidth ? (
         <Path
           testID="avatarHexagonBorder"
-          d={hexagonPath(size, rounded, strokeWidth / 2)}
+          d={path(size, rounded, strokeWidth / 2)}
           fill="none"
           stroke={stroke}
           strokeWidth={strokeWidth}

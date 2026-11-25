@@ -191,14 +191,14 @@ export function BottomBar({navigation}: BottomTabBarProps) {
   const {
     shape: avatarShape,
     radius: avatarRadius,
-    hexagon: avatarIsHexagon,
+    polygon: avatarIsPolygon,
   } = resolveAvatarShape({
     size: avatarSize,
     type: isLabeler ? 'labeler' : 'user',
     profileShape,
     squareAvatars: enableSquareAvatars,
   })
-  // A hexagon cannot take a rounded-rect ring, so the active ring around it is
+  // A polygon cannot take a rounded-rect ring, so the active ring around it is
   // a circle. The border keeps the icon's footprint in every state.
   const ringWidth = isAtMyProfile
     ? live
@@ -210,7 +210,7 @@ export function BottomBar({navigation}: BottomTabBarProps) {
   // The wrapper follows the avatar's own radius; a circle is a clamp rather
   // than a measured radius, and sharp avatars have no rounding to follow.
   const ringRadius =
-    avatarIsHexagon || avatarShape === 'circle'
+    avatarIsPolygon || avatarShape === 'circle'
       ? 100
       : avatarShape === 'sharp'
         ? 0
@@ -383,7 +383,7 @@ export function BottomBar({navigation}: BottomTabBarProps) {
                       {
                         borderWidth: ringWidth,
                         borderColor:
-                          isAtMyProfile && !avatarIsHexagon
+                          isAtMyProfile && !avatarIsPolygon
                             ? t.atoms.text.color
                             : 'transparent',
                         borderRadius: ringRadius,

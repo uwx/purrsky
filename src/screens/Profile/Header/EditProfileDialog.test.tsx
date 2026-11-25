@@ -180,7 +180,7 @@ jest.mock('#/view/com/util/UserAvatar', () => {
     UserAvatar: () => react.createElement(rn.View, null),
     EditableUserAvatar: () => react.createElement(rn.View, null),
     getSquareAvatarRadius: () => 8,
-    resolveAvatarShape: () => ({shape: 'circle', radius: 8, hexagon: false}),
+    resolveAvatarShape: () => ({shape: 'circle', radius: 8, polygon: false}),
   }
 })
 jest.mock('#/view/com/util/UserBanner', () => ({

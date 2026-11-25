@@ -10,7 +10,12 @@ export {
   parseAnimatedAvatarBlob,
 } from './animatedAvatar'
 export {AvatarDecorationRing} from './AvatarDecorationRing'
-export {AVATAR_SHAPES, type AvatarShape, hexagonPath} from './avatarShapes'
+export {
+  AVATAR_SHAPES,
+  type AvatarShape,
+  hexagonPath,
+  trianglePath,
+} from './avatarShapes'
 export {
   DECORATION_FRAMES,
   type DecorationFrame,

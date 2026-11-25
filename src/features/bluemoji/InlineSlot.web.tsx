@@ -109,6 +109,12 @@ export function InlineSlot({
            */
           width: box?.height ?? '100%',
           height: box?.height ?? '100%',
+          /*
+           * Without this the media is an inline-level child of a line box that
+           * inherits the post's line-height, so the browser drops it onto the
+           * text baseline and it paints a full line leading below the glyph.
+           */
+          display: 'flex',
         }}>
         {children}
       </span>

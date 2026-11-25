@@ -14,6 +14,7 @@ const domTests = [
   '<rootDir>/src/features/avatarDecorations/HexagonAvatar.web.test.tsx',
   '<rootDir>/src/features/avatarDecorations/editor/DecorationColorField/index.web.test.tsx',
   '<rootDir>/src/features/bluemoji/Picker.web.test.tsx',
+  '<rootDir>/src/features/bluemoji/InlineSlot.web.test.tsx',
 ]
 
 function preset(name) {

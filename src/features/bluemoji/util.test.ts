@@ -234,6 +234,21 @@ it('treats an animation as a rendition when the item has no picture', () => {
   })
 })
 
+it('keeps the licence that permits copying, and rejects one past the limit', () => {
+  /*
+   * The licence is the only thing the copy flow reads to decide whether
+   * someone else may take a copy, so a record carrying one must survive the
+   * strict parser. Past 128 bytes the lexicon drops the whole record, which is
+   * why the editor caps the field.
+   */
+  expect(
+    parseBluemojiItemRecord({...item.record, license: 'CC-BY-4.0'})?.license,
+  ).toBe('CC-BY-4.0')
+  expect(
+    parseBluemojiItemRecord({...item.record, license: 'x'.repeat(129)}),
+  ).toBeUndefined()
+})
+
 it('addresses blobs on the PDS that stores them', () => {
   expect(
     getBluemojiBlobUrl(animatedItem.did, lottieCid, 'https://pds.example'),

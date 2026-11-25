@@ -3,16 +3,34 @@ import {I18nProvider} from '@lingui/react'
 import {QueryClient, QueryClientProvider} from '@tanstack/react-query'
 import {renderHook} from '@testing-library/react-native'
 
+import {uploadBlob} from '#/lib/api'
+import {type PickerImage} from '#/lib/media/picker.shared'
 import {
   ITEM_COLLECTION,
   useBulkEmojiMutation,
   useDeleteEmojiMutation,
   useSaveEmojiMutation,
 } from '#/features/bluemoji/collection/mutations'
+import {type PreparedEmojiImage} from '#/features/bluemoji/collection/prepare'
 import {OWN_COLLECTION_ROOT} from '#/features/bluemoji/collection/queries'
 import {type BluemojiItem} from '#/features/bluemoji/util'
 
 jest.unmock('multiformats/cid')
+
+/**
+ * An upload result carrying a link. The real one is a lex `BlobRef`, but only
+ * the link reaches the record, so the rest is filled in just enough to type.
+ */
+function blob(link: string) {
+  return {
+    blob: {$type: 'blob', ref: {$link: link}, mimeType: 'image/png', size: 1},
+  } as unknown as Awaited<ReturnType<typeof uploadBlob>>
+}
+
+/** A picked file; only the path and mime reach the mocked upload. */
+function picked(path: string): PickerImage {
+  return {path, mime: 'image/png', width: 128, height: 128, size: 1024}
+}
 
 type CallParams = {
   rkey?: string
@@ -137,12 +155,69 @@ it('replaces the renditions when a new image is picked', async () => {
 
   await result.current.mutateAsync({
     alias: ':blobcat:',
-    image: {path: '/tmp/cat.png', mime: 'image/png'} as never,
+    image: {image: picked('/tmp/cat.png'), rendition: 'png_128'},
     editing: item,
   })
 
   expect(calls()[0][1].record?.formats?.png_128).toEqual({
     ref: {$link: 'bafynew'},
+  })
+  expect(jest.mocked(uploadBlob)).toHaveBeenCalledTimes(1)
+})
+
+it('writes animated bytes to their own slot and a still alongside them', async () => {
+  const queryClient = new QueryClient()
+  const {result} = renderHook(() => useSaveEmojiMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  await result.current.mutateAsync({
+    alias: ':blobcat:',
+    image: {
+      image: picked('/tmp/cat.png'),
+      rendition: 'apng_128',
+      still: picked('/tmp/cat-still.png'),
+    } satisfies PreparedEmojiImage,
+  })
+
+  // Two uploads: the animated original first, its first frame second.
+  expect(jest.mocked(uploadBlob).mock.calls.map(([, input]) => input)).toEqual([
+    '/tmp/cat.png',
+    '/tmp/cat-still.png',
+  ])
+  const formats = calls()[0][1].record?.formats
+  expect(Object.keys(formats ?? {})).toEqual(['$type', 'apng_128', 'png_128'])
+  expect(formats?.apng_128).toEqual({ref: {$link: 'bafynew'}})
+  expect(formats?.png_128).toEqual({ref: {$link: 'bafynew'}})
+})
+
+it('uses the still as the pack icon rather than an animation nobody sees', async () => {
+  const queryClient = new QueryClient()
+  const {result} = renderHook(() => useBulkEmojiMutation(), {
+    wrapper: setup(queryClient),
+  })
+  const image: PreparedEmojiImage = {
+    image: picked('/tmp/cat.png'),
+    rendition: 'apng_128',
+    still: picked('/tmp/cat-still.png'),
+  }
+  // Distinct links per upload, so "the icon is the still" is falsifiable.
+  jest
+    .mocked(uploadBlob)
+    .mockResolvedValueOnce(blob('bafyanim'))
+    .mockResolvedValueOnce(blob('bafystill'))
+
+  await result.current.mutateAsync({
+    drafts: [{alias: ':one:', image}],
+    pack: {name: 'cats'},
+  })
+
+  const pack = calls().find(
+    ([, params]) => params.collection === 'blue.moji.packs.pack',
+  )
+  expect(pack?.[1].record).toMatchObject({icon: {ref: {$link: 'bafystill'}}})
+  expect(calls()[0][1].record?.formats?.apng_128).toMatchObject({
+    ref: {$link: 'bafyanim'},
   })
 })
 
@@ -168,7 +243,7 @@ it('writes the licence that lets others copy the emoji', async () => {
   await result.current.mutateAsync({
     alias: ':blobcat:',
     license: ' CC0-1.0 ',
-    image: {path: '/tmp/cat.png', mime: 'image/png'} as never,
+    image: {image: picked('/tmp/cat.png'), rendition: 'png_128'},
   })
 
   expect(calls()[0][1].record).toMatchObject({license: 'CC0-1.0'})
@@ -218,7 +293,10 @@ it('creates a pack from a bulk upload and adds every written emoji to it', async
     wrapper: setup(queryClient),
   })
 
-  const image = {path: '/tmp/cat.png', mime: 'image/png'} as never
+  const image: PreparedEmojiImage = {
+    image: picked('/tmp/cat.png'),
+    rendition: 'png_128',
+  }
   const outcome = await result.current.mutateAsync({
     drafts: [
       {alias: ':one:', image, license: 'CC0-1.0'},
@@ -276,7 +354,10 @@ it('reports a pack failure without losing the emoji that saved', async () => {
 
   const outcome = await result.current.mutateAsync({
     drafts: [
-      {alias: ':one:', image: {path: '/tmp/a.png', mime: 'image/png'} as never},
+      {
+        alias: ':one:',
+        image: {image: picked('/tmp/a.png'), rendition: 'png_128'},
+      },
     ],
     pack: {name: 'cats'},
   })

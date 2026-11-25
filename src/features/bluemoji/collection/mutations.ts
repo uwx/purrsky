@@ -5,11 +5,11 @@ import {useMutation, useQueryClient} from '@tanstack/react-query'
 
 import {uploadBlob} from '#/lib/api'
 import {useHaptics} from '#/lib/haptics'
-import {type PickerImage} from '#/lib/media/picker.shared'
 import {logger} from '#/logger'
 import {usePdsClient} from '#/state/session'
 import * as Toast from '#/components/Toast'
 import {aliasToRkey, normalizeAlias} from '#/features/bluemoji/alias'
+import {type PreparedEmojiImage} from '#/features/bluemoji/collection/prepare'
 import {OWN_COLLECTION_ROOT} from '#/features/bluemoji/collection/queries'
 import {
   invalidatePacks,
@@ -26,8 +26,8 @@ export type EmojiDraft = {
   /** Raw alias, with or without wrapping colons. */
   alias: string
   alt?: string
-  /** New image, as returned by the picker. Omitting it keeps the current one. */
-  image?: PickerImage
+  /** New image, as prepared by `prepareEmojiImage`. Omitting it keeps the current one. */
+  image?: PreparedEmojiImage
   adultOnly?: boolean
   /**
    * SPDX expression such as `CC-BY-4.0`. Omitting it keeps whatever the edited
@@ -71,12 +71,22 @@ async function putEmoji(
       ? editing?.record.license || undefined
       : license.trim() || undefined
   const uploaded = image
-    ? (await uploadBlob(pds, image.path, image.mime)).blob
+    ? (await uploadBlob(pds, image.image.path, image.image.mime)).blob
     : undefined
-  const formats = uploaded
+  const still = image?.still
+    ? (await uploadBlob(pds, image.still.path, image.still.mime)).blob
+    : undefined
+  const formats = image
     ? {
         $type: 'blue.moji.collection.item#formats_v1' as const,
-        png_128: uploaded,
+        ...(image.rendition === 'png_128'
+          ? {png_128: uploaded}
+          : {
+              // The animated bytes are the rendition readers animate; the still
+              // keeps clients that only know `png_128` from showing nothing.
+              [image.rendition]: uploaded,
+              ...(still ? {png_128: still} : {}),
+            }),
       }
     : // Keep the existing renditions; the AppView serves those blobs.
       editing?.record.formats
@@ -111,9 +121,10 @@ async function putEmoji(
     uri: `at://${pds.assertDid}/${ITEM_COLLECTION}/${rkey}`,
     /*
      * The blob this call uploaded, not the record's rendition: an edit without
-     * a new image has nothing new to use as a pack icon.
+     * a new image has nothing new to use as a pack icon. A pack icon is drawn
+     * small and still, so an animated upload lends it its first frame.
      */
-    icon: uploaded,
+    icon: still ?? uploaded,
   }
 }
 

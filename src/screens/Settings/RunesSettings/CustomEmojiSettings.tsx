@@ -3,14 +3,14 @@ import {View} from 'react-native'
 import {Image} from 'expo-image'
 import {Trans, useLingui} from '@lingui/react/macro'
 
-import {compressIfNeeded} from '#/lib/media/manip'
-import {openPicker, type RNImage} from '#/lib/media/picker'
+import {openPicker} from '#/lib/media/picker'
 import {atoms as a, useTheme} from '#/alf'
 import {Button, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import * as TextField from '#/components/forms/TextField'
 import * as Toggle from '#/components/forms/Toggle'
 import * as Prompt from '#/components/Prompt'
+import * as Toast from '#/components/Toast'
 import {Text} from '#/components/Typography'
 import {BluemojiImage} from '#/features/bluemoji/BluemojiImage'
 import {BulkEmojiDialogForm} from '#/features/bluemoji/collection/BulkEmojiDialog'
@@ -19,6 +19,10 @@ import {
   useDeleteEmojiMutation,
   useSaveEmojiMutation,
 } from '#/features/bluemoji/collection/mutations'
+import {
+  type PreparedEmojiImage,
+  prepareEmojiImage,
+} from '#/features/bluemoji/collection/prepare'
 import {useOwnCollectionQuery} from '#/features/bluemoji/collection/queries'
 import {PacksSection} from '#/features/bluemoji/packs/PacksSection'
 import {NewEmojiTile, Tile, TileGrid} from '#/features/bluemoji/Picker'
@@ -166,7 +170,7 @@ function EmojiForm({
   const {t: l} = useLingui()
   const t = useTheme()
   const {mutate: save, isPending} = useSaveEmojiMutation()
-  const [file, setFile] = useState<RNImage | null>(null)
+  const [file, setFile] = useState<PreparedEmojiImage | null>(null)
   const [alias, setAlias] = useState(editing?.record.name ?? '')
   const [alt, setAlt] = useState(editing?.record.alt ?? '')
   const [adultOnly, setAdultOnly] = useState(editing?.record.adultOnly ?? false)
@@ -175,14 +179,14 @@ function EmojiForm({
   const pick = async () => {
     const [asset] = await openPicker()
     if (!asset) return
-    // The AppView renders its own renditions, so one 128px source is enough.
-    setFile(
-      await compressIfNeeded(asset, {
-        // blob_v1 caps renditions at 128kb.
-        maxDimension: 128,
-        maxSize: 128_000,
-      }),
-    )
+    const prepared = await prepareEmojiImage(asset)
+    setFile(prepared)
+    if (prepared.flattened) {
+      Toast.show(
+        l`This animation is over the 128 KB emoji limit, so it will be saved as a still image.`,
+        {type: 'warning'},
+      )
+    }
   }
 
   // An edit can keep its current image, so a file is only required for a new one.
@@ -209,7 +213,7 @@ function EmojiForm({
             ]}>
             {file ? (
               <Image
-                source={{uri: file.path}}
+                source={{uri: file.image.path}}
                 contentFit="contain"
                 style={{width: 64, height: 64}}
                 accessibilityLabel={l`Emoji preview`}

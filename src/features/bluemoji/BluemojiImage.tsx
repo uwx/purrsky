@@ -55,6 +55,7 @@ export function BluemojiImage({
           source={{uri}}
           contentFit="contain"
           cachePolicy="memory-disk"
+          autoplay={!autoplayDisabled}
           style={{width: size, height: size}}
           accessibilityLabel={label}
           accessibilityHint={undefined}

@@ -1,8 +1,8 @@
 import {useState} from 'react'
 import {View} from 'react-native'
+import {plural} from '@lingui/core/macro'
 import {Trans, useLingui} from '@lingui/react/macro'
 
-import {compressIfNeeded} from '#/lib/media/manip'
 import {openMultiplePicker, type RNImage} from '#/lib/media/picker'
 import {atoms as a, useTheme} from '#/alf'
 import {Admonition} from '#/components/Admonition'
@@ -10,10 +10,12 @@ import {Button, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import * as TextField from '#/components/forms/TextField'
 import * as Toggle from '#/components/forms/Toggle'
+import * as Toast from '#/components/Toast'
 import {Text} from '#/components/Typography'
 import {IS_WEB} from '#/env'
 import {aliasFromFileName, aliasToRkey} from '#/features/bluemoji/alias'
 import {type EmojiDraft} from '#/features/bluemoji/collection/mutations'
+import {prepareEmojiImage} from '#/features/bluemoji/collection/prepare'
 import {
   getPackDescriptionError,
   getPackNameError,
@@ -87,17 +89,23 @@ export function BulkEmojiDialogForm({
     !isPending
 
   const save = async () => {
-    // Resize up front, sequentially, so a huge folder does not spike memory.
+    // Prepare up front, sequentially, so a huge folder does not spike memory.
     const drafts: EmojiDraft[] = []
+    let flattened = 0
     for (const row of rows) {
-      drafts.push({
-        alias: row.alias,
-        license,
-        image: await compressIfNeeded(row.image, {
-          maxDimension: 128,
-          maxSize: 128_000,
+      const image = await prepareEmojiImage(row.image)
+      if (image.flattened) flattened++
+      drafts.push({alias: row.alias, license, image})
+    }
+    if (flattened) {
+      Toast.show(
+        plural(flattened, {
+          one: '# animation is over the 128 KB emoji limit, so it is saved as a still image.',
+          other:
+            '# animations are over the 128 KB emoji limit, so they are saved as still images.',
         }),
-      })
+        {type: 'warning'},
+      )
     }
     setDone(0)
     onSave(

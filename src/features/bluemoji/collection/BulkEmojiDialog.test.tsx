@@ -30,8 +30,9 @@ jest.mock('#/lib/media/picker', () => ({
     ]),
   ),
 }))
-jest.mock('#/lib/media/manip', () => ({
-  compressIfNeeded: (image: unknown) => Promise.resolve(image),
+jest.mock('#/features/bluemoji/collection/prepare', () => ({
+  prepareEmojiImage: (image: unknown) =>
+    Promise.resolve({image, rendition: 'png_128'}),
 }))
 // The real Typography module pulls in a native-only text view the test renderer
 // cannot load; plain RN Text behaves the same for these assertions.

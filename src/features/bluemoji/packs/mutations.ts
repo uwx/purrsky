@@ -1,5 +1,5 @@
 import {TID} from '@atproto/common-web'
-import {type Client} from '@atproto/lex'
+import {type $Typed, type Client} from '@atproto/lex'
 import {
   AtUri,
   type NsidString,
@@ -12,6 +12,7 @@ import {
   useMutation,
   useQueryClient,
 } from '@tanstack/react-query'
+import chunk from 'lodash.chunk'
 
 import {uploadBlob} from '#/lib/api'
 import {useHaptics} from '#/lib/haptics'
@@ -47,6 +48,13 @@ import {
 } from './util'
 
 export const ITEM_COLLECTION: NsidString = 'blue.moji.collection.item'
+
+/**
+ * Max records per `com.atproto.repo.applyWrites` request. The PDS refuses very
+ * large batches; 50 keeps each request small and gives the progress display
+ * something to count in between.
+ */
+const DELETES_PER_REQUEST = 50
 
 export type PackDraft = {
   name: string
@@ -190,22 +198,30 @@ export function useDeletePackMutation() {
     mutationFn: async ({
       pack,
       deleteItems = false,
+      onProgress,
     }: {
       pack: BluemojiPack
       /** Also delete the emoji only this pack uses, from the collection. */
       deleteItems?: boolean
+      /** Receives how many records have been deleted, and how many there are. */
+      onProgress?: (done: number, total: number) => void
     }) => {
       const rkey = packRkey(pack.uri)
       if (!rkey) throw new Error('Not a pack record')
       const memberships = await fetchPackItemRecords(pds)
       const own = memberships.filter(item => item.pack === pack.uri)
-      for (const item of own) {
-        await pds.call(com.atproto.repo.deleteRecord, {
-          repo: pds.assertDid,
-          collection: PACK_ITEM_COLLECTION,
-          rkey: new AtUri(item.uri).rkey,
-        })
-      }
+
+      /*
+       * All of it goes out as applyWrites batches: one request per chunk of
+       * records rather than one per record, which is what made deleting a pack
+       * with many emoji slow enough to look stuck. The pack record goes last so
+       * that a failure part way through leaves it in place, and the user can
+       * retry.
+       */
+      const writes = own.map(item =>
+        deleteWrite(PACK_ITEM_COLLECTION, new AtUri(item.uri).rkey),
+      )
+
       let deletedItems = 0
       let keptItems = 0
       if (deleteItems) {
@@ -224,19 +240,24 @@ export function useDeletePackMutation() {
             keptItems++
             continue
           }
-          await pds.call(com.atproto.repo.deleteRecord, {
-            repo: pds.assertDid,
-            collection: ITEM_COLLECTION,
-            rkey: uri.rkey,
-          })
+          writes.push(deleteWrite(ITEM_COLLECTION, uri.rkey))
           deletedItems++
         }
       }
-      await pds.call(com.atproto.repo.deleteRecord, {
-        repo: pds.assertDid,
-        collection: PACK_COLLECTION,
-        rkey,
-      })
+
+      writes.push(deleteWrite(PACK_COLLECTION, rkey))
+
+      const total = writes.length
+      let done = 0
+      onProgress?.(done, total)
+      for (const batch of chunk(writes, DELETES_PER_REQUEST)) {
+        await pds.call(com.atproto.repo.applyWrites, {
+          repo: pds.assertDid,
+          writes: batch,
+        })
+        done += batch.length
+        onProgress?.(done, total)
+      }
       return {name: pack.record.name, deletedItems, keptItems}
     },
     onError: error => {
@@ -275,6 +296,14 @@ function toOwnItemUri(subject: string, did: string) {
   } catch {
     return null
   }
+}
+
+/** A single record deletion for a `com.atproto.repo.applyWrites` batch. */
+function deleteWrite(
+  collection: NsidString,
+  rkey: string,
+): $Typed<com.atproto.repo.applyWrites.Delete> {
+  return {collection, rkey, $type: 'com.atproto.repo.applyWrites#delete'}
 }
 
 /** Every membership record in the repo, with the item each one points at. */

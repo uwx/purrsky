@@ -177,7 +177,20 @@ it('does not add a membership for an emoji already in the pack', async () => {
   expect(writesTo(PACK_ITEM_COLLECTION)).toHaveLength(0)
 })
 
-it('deletes the memberships before the pack record', async () => {
+function batches() {
+  return calls()
+    .filter(([def]) => def.$nsid === 'com.atproto.repo.applyWrites')
+    .map(([, params]) => params.writes as {collection: string; rkey: string}[])
+}
+
+/** Every record deletion, as collection/rkey, in the order it was sent. */
+function deletedRecords() {
+  return batches().map(batch =>
+    batch.map(write => `${write.collection}/${write.rkey}`),
+  )
+}
+
+it('deletes the memberships and the pack record in one batched request', async () => {
   listRecords([
     {
       uri: 'at://did:plc:me/blue.moji.packs.packitem/3kitem',
@@ -197,18 +210,13 @@ it('deletes the memberships before the pack record', async () => {
 
   await result.current.mutateAsync({pack})
 
-  const deletions = calls().filter(
-    ([def]) => def.$nsid === 'com.atproto.repo.deleteRecord',
-  )
-  expect(deletions).toHaveLength(2)
-  expect(deletions[0][1]).toMatchObject({
-    collection: PACK_ITEM_COLLECTION,
-    rkey: '3kitem',
-  })
-  expect(deletions[1][1]).toMatchObject({
-    collection: PACK_COLLECTION,
-    rkey: '3kpack',
-  })
+  /*
+   * One request for the whole thing, and the memberships before the pack: a
+   * pack record left behind is retryable, orphaned memberships are not.
+   */
+  expect(deletedRecords()).toEqual([
+    [`${PACK_ITEM_COLLECTION}/3kitem`, `${PACK_COLLECTION}/3kpack`],
+  ])
 })
 
 function membership(packUri: string, rkey: string, subject: string) {
@@ -238,15 +246,14 @@ it('deletes the collection items too, after their memberships', async () => {
 
   const summary = await result.current.mutateAsync({pack, deleteItems: true})
 
-  const deletions = calls()
-    .filter(([def]) => def.$nsid === 'com.atproto.repo.deleteRecord')
-    .map(([, params]) => `${String(params.collection)}/${String(params.rkey)}`)
-  expect(deletions).toEqual([
-    `${PACK_ITEM_COLLECTION}/3kone`,
-    `${PACK_ITEM_COLLECTION}/3ktwo`,
-    `${ITEM_COLLECTION}/one`,
-    `${ITEM_COLLECTION}/two`,
-    `${PACK_COLLECTION}/3kpack`,
+  expect(deletedRecords()).toEqual([
+    [
+      `${PACK_ITEM_COLLECTION}/3kone`,
+      `${PACK_ITEM_COLLECTION}/3ktwo`,
+      `${ITEM_COLLECTION}/one`,
+      `${ITEM_COLLECTION}/two`,
+      `${PACK_COLLECTION}/3kpack`,
+    ],
   ])
   expect(summary).toEqual({name: 'cats', deletedItems: 2, keptItems: 0})
 })
@@ -265,12 +272,8 @@ it('keeps an emoji another pack still includes', async () => {
 
   const summary = await result.current.mutateAsync({pack, deleteItems: true})
 
-  const deletions = calls()
-    .filter(([def]) => def.$nsid === 'com.atproto.repo.deleteRecord')
-    .map(([, params]) => `${String(params.collection)}/${String(params.rkey)}`)
-  expect(deletions).toEqual([
-    `${PACK_ITEM_COLLECTION}/3kone`,
-    `${PACK_COLLECTION}/3kpack`,
+  expect(deletedRecords()).toEqual([
+    [`${PACK_ITEM_COLLECTION}/3kone`, `${PACK_COLLECTION}/3kpack`],
   ])
   expect(summary).toEqual({name: 'cats', deletedItems: 0, keptItems: 1})
 })
@@ -294,9 +297,37 @@ it('never deletes an item that lives in another repo', async () => {
   const summary = await result.current.mutateAsync({pack, deleteItems: true})
 
   expect(
-    writesTo(ITEM_COLLECTION).filter(
-      ([def]) => def.$nsid === 'com.atproto.repo.deleteRecord',
-    ),
+    deletedRecords()
+      .flat()
+      .filter(r => r.startsWith(ITEM_COLLECTION)),
   ).toHaveLength(0)
   expect(summary).toEqual({name: 'cats', deletedItems: 0, keptItems: 1})
+})
+
+it('splits a large pack into batches and reports progress as they land', async () => {
+  listRecords(
+    Array.from({length: 60}, (_, i) =>
+      membership(pack.uri, `3kitem${i}`, itemUri(`item${i}`)),
+    ),
+  )
+
+  const queryClient = new QueryClient()
+  const {result} = renderHook(() => useDeletePackMutation(), {
+    wrapper: setup(queryClient),
+  })
+
+  const progress: [number, number][] = []
+  await result.current.mutateAsync({
+    pack,
+    onProgress: (done, total) => progress.push([done, total]),
+  })
+
+  // 60 memberships plus the pack record, in chunks of 50.
+  expect(batches().map(batch => batch.length)).toEqual([50, 11])
+  expect(deletedRecords().flat()).toHaveLength(61)
+  expect(progress).toEqual([
+    [0, 61],
+    [50, 61],
+    [61, 61],
+  ])
 })

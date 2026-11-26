@@ -28,6 +28,10 @@ import {
 } from '#/state/queries/post-feed'
 import {type VideoFeedSourceContext} from '#/screens/VideoFeed/types'
 import {atoms as a, tokens, useBreakpoints, useGutters, useTheme} from '#/alf'
+import {
+  type AspectRatioItem,
+  packIntoStrips,
+} from '#/components/feeds/mediaGridLayout'
 import {useLightboxControls} from '#/components/Lightbox/state'
 import {type Dimensions} from '#/components/Lightbox/types'
 import {Link} from '#/components/Link'
@@ -158,28 +162,10 @@ export function postHasGridMedia(post: app.bsky.feed.defs.PostView) {
   )
 }
 
-/** Spreads tiles into columns, always adding to the shortest one. */
-export function distributeIntoColumns<T extends {aspectRatio: number}>(
-  items: T[],
-  columns: number,
-): T[][] {
-  const result: T[][] = Array.from({length: columns}, () => [])
-  const heights = new Array(columns).fill(0)
-  for (const item of items) {
-    let shortest = 0
-    for (let i = 1; i < columns; i++) {
-      if (heights[i] < heights[shortest]) shortest = i
-    }
-    result[shortest].push(item)
-    heights[shortest] += 1 / item.aspectRatio
-  }
-  return result
-}
-
 /**
- * A block of masonry: the media of a run of posts, spread over the columns and
- * rendered as one list row. Each block starts its own column balance, so
- * `PostFeed` keeps them short enough to balance well and to stay cheap.
+ * A block of the media grid: the media of a run of posts, rendered as one list
+ * row. Every strip fills the row, and blocks are spaced by the same gap as the
+ * tiles inside them, so consecutive blocks read as one continuous wall.
  */
 export function MediaGridRow({
   items,
@@ -191,25 +177,26 @@ export function MediaGridRow({
   sourceContext: VideoFeedSourceContext
 }) {
   const columns = useMediaGridColumns()
-  const gutters = useGutters(['base', 'base', 0, 'base'])
+  const gutters = useGutters([0, 'base', 0, 'base'])
   const tiles = items.flatMap(getMediaGridItems)
 
   if (tiles.length === 0) return null
 
-  const distributed = distributeIntoColumns(tiles, columns)
+  const strips = packIntoStrips(tiles, columns)
 
   return (
-    <View style={[gutters, a.py_xs]}>
-      <View style={[a.flex_row, a.gap_2xs]}>
-        {distributed.map((column, columnIndex) => (
-          <View key={columnIndex} style={[a.flex_1, a.gap_2xs, {minWidth: 0}]}>
-            {column.map(tile => (
-              <MediaGridTile
-                key={tile.key}
-                tile={tile}
-                feedDescriptor={feedDescriptor}
-                sourceContext={sourceContext}
-              />
+    <View style={[gutters, a.pb_2xs]}>
+      <View style={a.gap_2xs}>
+        {strips.map(strip => (
+          <View key={strip[0].key} style={[a.flex_row, a.gap_2xs]}>
+            {strip.map(tile => (
+              <View key={tile.key} style={stripStyle(tile)}>
+                <MediaGridTile
+                  tile={tile}
+                  feedDescriptor={feedDescriptor}
+                  sourceContext={sourceContext}
+                />
+              </View>
             ))}
           </View>
         ))}
@@ -221,24 +208,42 @@ export function MediaGridRow({
 export function MediaGridRowPlaceholder() {
   const t = useTheme()
   const columns = useMediaGridColumns()
-  const gutters = useGutters(['base', 'base', 0, 'base'])
-  const ratios = [4 / 5, 1, 3 / 4]
+  const gutters = useGutters([0, 'base', 0, 'base'])
+  const ratios = [3 / 4, 1, 4 / 3, 4 / 3, 1, 3 / 4, 1, 1, 1]
+  const strips = packIntoStrips(
+    ratios.map(aspectRatio => ({aspectRatio})),
+    columns,
+  )
+
   return (
-    <View style={[gutters, a.py_xs]}>
-      <View style={[a.flex_row, a.gap_2xs]}>
-        {Array.from({length: columns}, (_, columnIndex) => (
-          <View key={columnIndex} style={[a.flex_1, a.gap_2xs]}>
-            {ratios.map((aspectRatio, rowIndex) => (
-              <View
-                key={rowIndex}
-                style={[t.atoms.bg_contrast_25, a.rounded_sm, {aspectRatio}]}
-              />
+    <View style={[gutters, a.pb_2xs]}>
+      <View style={a.gap_2xs}>
+        {strips.map((strip, stripIndex) => (
+          <View key={stripIndex} style={[a.flex_row, a.gap_2xs]}>
+            {strip.map((tile, tileIndex) => (
+              <View key={tileIndex} style={stripStyle(tile)}>
+                <View
+                  style={[
+                    t.atoms.bg_contrast_25,
+                    a.rounded_sm,
+                    {aspectRatio: tile.aspectRatio},
+                  ]}
+                />
+              </View>
             ))}
           </View>
         ))}
       </View>
     </View>
   )
+}
+
+/**
+ * Gives a tile the share of the strip its aspect ratio asks for. Every tile in
+ * a strip ends up the same height, because width grows with the ratio.
+ */
+function stripStyle({aspectRatio}: AspectRatioItem) {
+  return {flexBasis: 0, flexGrow: aspectRatio, minWidth: 0}
 }
 
 function MediaGridTile({

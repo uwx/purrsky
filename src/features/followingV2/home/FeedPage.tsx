@@ -27,6 +27,7 @@ import {userStyle} from '#/lib/userstyles'
 import {listenSoftReset} from '#/state/events'
 import {useSetHomeBadge} from '#/state/home-badge'
 import {useDisableInfiniteScroll} from '#/state/preferences/disable-infinite-scroll'
+import {useMediaGridView} from '#/state/preferences/media-grid-view'
 import {type FeedSourceInfo} from '#/state/queries/feed'
 import {usePreferencesQuery} from '#/state/queries/preferences'
 import {useSession} from '#/state/session'
@@ -124,6 +125,7 @@ function FollowingFeedPage({
   const t = useTheme()
   const inDeck = useIsInDeckColumn()
   const {gtMobile} = useBreakpoints()
+  const mediaGridView = useMediaGridView()
 
   useEffect(() => {
     if (isPageFocused) {
@@ -221,6 +223,7 @@ function FollowingFeedPage({
             headerOffset={headerOffset}
             savedFeedConfig={savedFeedConfig}
             isVideoFeed={isVideoFeed}
+            mediaGrid={mediaGridView}
             ref={feedRef}
           />
         </FeedFeedbackProvider>

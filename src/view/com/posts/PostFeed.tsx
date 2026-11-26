@@ -72,11 +72,20 @@ import {
 import {Button, ButtonText} from '#/components/Button'
 import {ProgressGuide, SuggestedFollows} from '#/components/FeedInterstitials'
 import {
+  MediaGridRow,
+  MediaGridRowPlaceholder,
+  postHasGridMedia,
+  useMediaGridColumns,
+} from '#/components/feeds/MediaGrid'
+import {
   collectPdsProfileDidsForFeedRow,
   collectPostUrisForFeedRow,
   type FeedPostSliceOrGroup,
   filterFeedSlices,
   groupReposts,
+  groupRowsForMediaGrid,
+  MEDIA_GRID_ROW_TYPES,
+  type MediaGridFeedRow,
 } from '#/components/feeds/postFeedUtils'
 import {
   PostFeedVideoGridRow,
@@ -157,6 +166,10 @@ type FeedRow =
       key: string
     }
   | {
+      type: 'mediaGridRowPlaceholder'
+      key: string
+    }
+  | {
       type: 'videoGridRow'
       key: string
       items: FeedPostSliceItem[]
@@ -164,6 +177,7 @@ type FeedRow =
       feedContexts: (string | undefined)[]
       reqIds: (string | undefined)[]
     }
+  | MediaGridFeedRow
   | {
       type: 'sliceViewFullThread'
       key: string
@@ -220,7 +234,10 @@ export function getItemsForFeedback(feedRow: FeedRow): {
       feedContext: feedRow.items[i].feedContext,
       reqId: feedRow.items[i].reqId,
     }))
-  } else if (feedRow.type === 'videoGridRow') {
+  } else if (
+    feedRow.type === 'videoGridRow' ||
+    feedRow.type === 'mediaGridRow'
+  ) {
     return feedRow.items.map((item, i) => ({
       item,
       feedContext: feedRow.feedContexts[i],
@@ -262,6 +279,7 @@ let PostFeed = ({
   savedFeedConfig,
   initialNumToRender: initialNumToRenderOverride,
   isVideoFeed = false,
+  mediaGrid = false,
   useRepostCarousel = false,
   ref,
 }: {
@@ -287,6 +305,11 @@ let PostFeed = ({
   savedFeedConfig?: app.bsky.actor.defs.SavedFeed
   initialNumToRender?: number
   isVideoFeed?: boolean
+  /**
+   * Shows only the posts with media, as a masonry grid of their images and
+   * videos. Posts without media are left out, as are their text and controls.
+   */
+  mediaGrid?: boolean
   lastFetchDate?: () => number
   useRepostCarousel?: boolean
   ref?: React.Ref<PostFeedRef>
@@ -307,6 +330,7 @@ let PostFeed = ({
   const lastFetchRef = useRef<number>(Date.now())
   const [feedType, feedUriOrActorDid, feedTab] = feed.split('|')
   const videoGridColumns = useVideoGridColumns()
+  const mediaGridColumns = useMediaGridColumns()
   const {rightNavVisible} = useLayoutBreakpoints()
   const areVideoFeedsEnabled = IS_NATIVE
 
@@ -554,7 +578,7 @@ let PostFeed = ({
       } else if (data) {
         let sliceIndex = -1
 
-        if (isVideoFeed) {
+        if (isVideoFeed && !mediaGrid) {
           const videos: {
             item: FeedPostSliceItem
             feedContext: string | undefined
@@ -798,7 +822,12 @@ let PostFeed = ({
         })
       }
     } else {
-      if (isVideoFeed) {
+      if (mediaGrid) {
+        arr.push({
+          type: 'mediaGridRowPlaceholder',
+          key: 'mediaGridRowPlaceholder',
+        })
+      } else if (isVideoFeed) {
         arr.push({
           type: 'videoGridRowPlaceholder',
           key: 'videoGridRowPlaceholder',
@@ -808,6 +837,31 @@ let PostFeed = ({
           type: 'loading',
           key: 'loading',
         })
+      }
+    }
+
+    if (mediaGrid) {
+      arr = groupRowsForMediaGrid(arr, {
+        maxPosts: mediaGridColumns * 3,
+        sourceFeedUri: feedUriOrActorDid,
+        hasMedia: postHasGridMedia,
+        keepRowTypes: MEDIA_GRID_ROW_TYPES,
+      })
+      /*
+       * A feed with nothing to show in the grid should say so, rather than
+       * leaving a blank page that looks like a render failure.
+       */
+      if (
+        !arr.some(row => row.type === 'mediaGridRow') &&
+        !arr.some(
+          row =>
+            row.type === 'error' ||
+            row.type === 'empty' ||
+            row.type === 'loading' ||
+            row.type === 'mediaGridRowPlaceholder',
+        )
+      ) {
+        arr.push({type: 'empty', key: 'empty'})
       }
     }
 
@@ -836,6 +890,8 @@ let PostFeed = ({
     trendingVideoDisabled,
     videoGridColumns,
     isVideoFeed,
+    mediaGrid,
+    mediaGridColumns,
     areVideoFeedsEnabled,
     useRepostCarousel,
     hasPressedShowLessUris,
@@ -1045,6 +1101,37 @@ let PostFeed = ({
             sourceContext={sourceContext}
           />
         )
+      } else if (row.type === 'mediaGridRowPlaceholder') {
+        return (
+          <View>
+            <MediaGridRowPlaceholder />
+            <MediaGridRowPlaceholder />
+            <MediaGridRowPlaceholder />
+          </View>
+        )
+      } else if (row.type === 'mediaGridRow') {
+        let sourceContext: VideoFeedSourceContext
+        if (feedType === 'author') {
+          sourceContext = {
+            type: 'author',
+            did: feedUriOrActorDid,
+            filter: feedTab as AuthorFilter,
+          }
+        } else {
+          sourceContext = {
+            type: 'feedgen',
+            uri: row.sourceFeedUri,
+            sourceInterstitial: feedCacheKey ?? 'none',
+          }
+        }
+
+        return (
+          <MediaGridRow
+            items={row.items}
+            feedDescriptor={feed}
+            sourceContext={sourceContext}
+          />
+        )
       } else if (row.type === 'showLessFollowup') {
         return <ShowLessFollowup />
       } else {
@@ -1189,10 +1276,10 @@ let PostFeed = ({
 
   // Helper to calculate position in feed (count only root posts, not interstitials or thread replies)
   const getPostPosition = useNonReactiveCallback(
-    (type: FeedRow['type'], key: string) => {
+    (type: FeedRow['type'], key: string, indexInRow = 0) => {
       // Calculate position: find the row index in feedItems, then calculate position
       const rowIndex = feedItems.findIndex(
-        row => row.type === 'sliceItem' && row.key === key,
+        row => row.type === type && row.key === key,
       )
 
       if (rowIndex >= 0) {
@@ -1204,12 +1291,15 @@ let PostFeed = ({
             if (row.indexInSlice === 0) {
               position++
             }
-          } else if (row.type === 'videoGridRow') {
-            // Count each video in the grid row
+          } else if (
+            row.type === 'videoGridRow' ||
+            row.type === 'mediaGridRow'
+          ) {
+            // Count each post in a grid row
             position += row.items.length
           }
         }
-        return position
+        return position + indexInRow
       }
     },
   )
@@ -1335,8 +1425,8 @@ let PostFeed = ({
             })
           }
         }
-      } else if (item.type === 'videoGridRow') {
-        // Track each video in the grid row
+      } else if (item.type === 'videoGridRow' || item.type === 'mediaGridRow') {
+        // Track each post in the grid row
         for (let i = 0; i < item.items.length; i++) {
           const postItem = item.items[i]
           const post = postItem.post
@@ -1344,7 +1434,7 @@ let PostFeed = ({
           if (!seenPostUrisRef.current.has(post.uri)) {
             seenPostUrisRef.current.add(post.uri)
 
-            const position = getPostPosition('videoGridRow', item.key)
+            const position = getPostPosition(item.type, item.key, i)
 
             ax.metric('post:view', {
               uri: post.uri,

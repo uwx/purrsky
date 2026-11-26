@@ -39,6 +39,8 @@ export interface PagerWithHeaderProps {
   allowHeaderOverScroll?: boolean // Ignored on web.
   /** Native-only vertical room for horizontally clipped headers. */
   headerOverflowInset?: number
+  /** Rendered at the right end of the tab bar, after the tabs. */
+  tabBarTrailing?: React.ReactNode
 }
 export const PagerWithHeader = forwardRef<PagerRef, PagerWithHeaderProps>(
   function PageWithHeaderImpl(
@@ -51,6 +53,7 @@ export const PagerWithHeader = forwardRef<PagerRef, PagerWithHeaderProps>(
       initialPage,
       onPageSelected,
       onCurrentPageSelected,
+      tabBarTrailing,
     }: PagerWithHeaderProps,
     ref,
   ) {
@@ -68,6 +71,7 @@ export const PagerWithHeader = forwardRef<PagerRef, PagerWithHeaderProps>(
             onSelect={props.onSelect}
             tabBarAnchor={props.tabBarAnchor}
             testID={testID}
+            tabBarTrailing={tabBarTrailing}
           />
         )
       },
@@ -78,6 +82,7 @@ export const PagerWithHeader = forwardRef<PagerRef, PagerWithHeaderProps>(
         currentPage,
         onCurrentPageSelected,
         testID,
+        tabBarTrailing,
       ],
     )
 
@@ -125,6 +130,7 @@ let PagerTabBar = ({
   onCurrentPageSelected,
   onSelect,
   tabBarAnchor,
+  tabBarTrailing,
 }: {
   currentPage: number
   items: string[]
@@ -138,6 +144,7 @@ let PagerTabBar = ({
   onCurrentPageSelected?: (index: number) => void
   onSelect?: (index: number) => void
   tabBarAnchor?: JSX.Element | null | undefined
+  tabBarTrailing?: React.ReactNode
 }): React.ReactNode => {
   return (
     <>
@@ -162,6 +169,7 @@ let PagerTabBar = ({
           onPressSelected={onCurrentPageSelected}
           dragProgress={undefined as any /* native-only */}
           dragState={undefined as any /* native-only */}
+          trailing={tabBarTrailing}
         />
       </Layout.Center>
     </>

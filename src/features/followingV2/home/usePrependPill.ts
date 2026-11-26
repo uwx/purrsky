@@ -19,10 +19,23 @@ type Row = {
   items?: FeedPostSlice[] | FeedPostSliceItem[]
 }
 
-/** Post slices represented by a regular row or a repost carousel. */
-function postSlices(row: Row): FeedPostSlice[] {
-  if (row.type === 'sliceItem' && row.slice) return [row.slice]
-  if (row.type === 'reposts') return (row.items ?? []) as FeedPostSlice[]
+/** Post items represented by a row, one per post: a slice's own post. */
+function rowPosts(row: Row): FeedPostSliceItem[] {
+  if (row.type === 'sliceItem' && row.slice) {
+    const slice = row.slice
+    const item = slice.items.find(item => item.uri === slice.feedPostUri)
+    return item ? [item] : []
+  }
+  if (row.type === 'reposts') {
+    return ((row.items ?? []) as FeedPostSlice[]).flatMap(slice => {
+      const item = slice.items.find(item => item.uri === slice.feedPostUri)
+      return item ? [item] : []
+    })
+  }
+  // A grid row has already flattened its page's posts into items.
+  if (row.type === 'videoGridRow' || row.type === 'mediaGridRow') {
+    return (row.items ?? []) as FeedPostSliceItem[]
+  }
   return []
 }
 
@@ -58,11 +71,7 @@ export type PrependOffer = {
  * The author of a feed item's own post, if their avatar is safe to show: they
  * have one, and moderation neither blurs nor filters it.
  */
-function faceOf(slice: FeedPostSlice): NewPostsPillAuthor | undefined {
-  const item = slice.items.find(item => item.uri === slice.feedPostUri)
-  if (!item) {
-    return undefined
-  }
+function faceOf(item: FeedPostSliceItem): NewPostsPillAuthor | undefined {
   const {did, avatar} = item.post.author
   const ui = item.moderation.ui('avatar')
   if (!avatar || ui.blur || ui.filter) {
@@ -82,18 +91,18 @@ export function getPrependOffer(
   rows: readonly Row[],
   page: Page,
 ): PrependOffer | undefined {
-  const slices = new Set(page.slices)
-  const counted = new Set<FeedPostSlice>()
+  const uris = new Set(page.slices.map(slice => slice.feedPostUri))
+  const counted = new Set<string>()
   const keys: string[] = []
   const authors: NewPostsPillAuthor[] = []
   for (const row of rows) {
-    const rowSlices = postSlices(row).filter(slice => slices.has(slice))
-    if (!rowSlices.length) continue
+    const posts = rowPosts(row).filter(item => uris.has(item.uri))
+    if (!posts.length) continue
     keys.push(row.key)
-    for (const slice of rowSlices) {
-      if (counted.has(slice)) continue
-      counted.add(slice)
-      const face = faceOf(slice)
+    for (const item of posts) {
+      if (counted.has(item.uri)) continue
+      counted.add(item.uri)
+      const face = faceOf(item)
       if (
         face &&
         authors.length < FACE_LIMIT &&
@@ -124,11 +133,11 @@ export function livePrependOffer(
   let topKey: string | undefined
   for (const row of rows) {
     if (!keys.has(row.key)) continue
-    const slices = postSlices(row)
-    if (!slices.length) continue
+    const posts = rowPosts(row)
+    if (!posts.length) continue
     topKey ??= row.key
-    for (const slice of slices) {
-      const face = faceOf(slice)
+    for (const item of posts) {
+      const face = faceOf(item)
       if (face) faces.add(face.did)
     }
   }

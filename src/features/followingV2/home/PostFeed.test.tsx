@@ -24,6 +24,12 @@ jest.mock('#/alf', () => ({
   useTheme: () => ({palette: {primary_500: 'purple'}}),
   useLayoutBreakpoints: () => ({rightNavVisible: true}),
 }))
+jest.mock('#/components/feeds/MediaGrid', () => ({
+  MediaGridRow: () => null,
+  MediaGridRowPlaceholder: () => null,
+  postHasGridMedia: () => false,
+  useMediaGridColumns: () => 2,
+}))
 jest.mock('#/state/session', () => ({useSession: () => ({hasSession: true})}))
 jest.mock('#/state/cache/profile-shadow', () => ({
   usePostAuthorShadowFilter: () => [],

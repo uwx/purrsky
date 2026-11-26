@@ -9,6 +9,7 @@ import {useHideFeedsPromoTab} from '#/state/preferences/hide-feeds-promo-tab'
 import {type FeedSourceInfo} from '#/state/queries/feed'
 import {useSession} from '#/state/session'
 import {type RenderTabBarFnProps} from '#/view/com/pager/Pager'
+import {MediaGridToggle} from '#/components/feeds/MediaGridToggle'
 import {TabBar} from '../pager/TabBar'
 import {HomeHeaderLayout} from './HomeHeaderLayout'
 
@@ -78,6 +79,10 @@ export function HomeHeader(
         dragProgress={props.dragProgress}
         dragState={props.dragState}
         transparent
+        /* The last tab can be the Feeds promo, which shows no posts. */
+        trailing={
+          props.selectedPage < feeds.length ? <MediaGridToggle /> : null
+        }
       />
     </HomeHeaderLayout>
   )

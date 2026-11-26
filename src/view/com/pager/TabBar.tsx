@@ -37,6 +37,8 @@ export interface TabBarProps {
   dragProgress: SharedValue<number>
   dragState: SharedValue<'idle' | 'dragging' | 'settling'>
   transparent?: boolean
+  /** Rendered after the tabs, pinned to the right edge. */
+  trailing?: React.ReactNode
 }
 
 const ITEM_PADDING = 10
@@ -56,6 +58,7 @@ export function TabBar({
   dragProgress,
   dragState,
   transparent,
+  trailing,
 }: TabBarProps) {
   const t = useTheme()
   const scrollElRef = useAnimatedRef<ScrollView>()
@@ -383,6 +386,11 @@ export function TabBar({
           </Animated.View>
         </ScrollView>
       </BlockDrawerGesture>
+      {trailing ? (
+        <View style={[a.flex_shrink_0, a.justify_center, a.pl_2xs]}>
+          {trailing}
+        </View>
+      ) : null}
       <View style={[t.atoms.bg_contrast_100, styles.outerBottomBorder]} />
     </Center>
   )

@@ -27,6 +27,7 @@ import {userStyle} from '#/lib/userstyles'
 import {useProfileShadow} from '#/state/cache/profile-shadow'
 import {listenSoftReset} from '#/state/events'
 import {useHideDisplayNames} from '#/state/preferences/hide-display-names'
+import {useMediaGridView} from '#/state/preferences/media-grid-view'
 import {useModerationOpts} from '#/state/preferences/moderation-opts'
 import {useSeeThroughBlocks} from '#/state/preferences/see-through-blocks'
 import {useShowStandardLabelerProfile} from '#/state/preferences/show-standard-labeler-profile'
@@ -51,6 +52,7 @@ import {getProfileBannerSafeAreaCoverHeight} from '#/screens/Profile/Header/layo
 import {ProfileFeedSection} from '#/screens/Profile/Sections/Feed'
 import {ProfileLabelsSection} from '#/screens/Profile/Sections/Labels'
 import {atoms as a, useBreakpoints, useTheme} from '#/alf'
+import {MediaGridToggle} from '#/components/feeds/MediaGridToggle'
 import {Circle_And_Square_Stroke1_Corner0_Rounded_Filled as CircleAndSquareIcon} from '#/components/icons/CircleAndSquare'
 import {EditBig_Stroke2_Corner2_Rounded as EditBigIcon} from '#/components/icons/EditBig'
 import {Heart2_Stroke1_Corner0_Rounded as HeartIcon} from '#/components/icons/Heart2'
@@ -467,6 +469,17 @@ function ProfileScreenView({
   )
   const [currentPage, setCurrentPage] = useState(initialPage)
 
+  const mediaGridView = useMediaGridView()
+  /*
+   * The grid only makes sense on the tabs that are all media anyway, so the
+   * toggle shows up there and nowhere else.
+   */
+  const canShowMediaGrid =
+    currentPage === mediaIndex ||
+    currentPage === videosIndex ||
+    currentPage === likesIndex
+  const mediaGrid = mediaGridView && canShowMediaGrid
+
   const scrollSectionToTop = useCallback(
     (index: number) => {
       if (index === filtersIndex) {
@@ -598,7 +611,8 @@ function ProfileScreenView({
         onCurrentPageSelected={onCurrentPageSelected}
         renderHeader={renderHeader}
         allowHeaderOverScroll
-        headerOverflowInset={gtMobile ? windowHeight : undefined}>
+        headerOverflowInset={gtMobile ? windowHeight : undefined}
+        tabBarTrailing={canShowMediaGrid ? <MediaGridToggle /> : null}>
         {showFiltersTab
           ? ({headerHeight, isFocused, scrollElRef}) => (
               <ProfileLabelsSection
@@ -692,6 +706,7 @@ function ProfileScreenView({
                     : undefined
                 }
                 emptyStateIcon={ImageIcon}
+                mediaGrid={mediaGrid}
               />
             )
           : null}
@@ -719,6 +734,7 @@ function ProfileScreenView({
                     : undefined
                 }
                 emptyStateIcon={VideoIcon}
+                mediaGrid={mediaGrid}
               />
             )
           : null}
@@ -734,6 +750,7 @@ function ProfileScreenView({
                 setScrollViewTag={setScrollViewTag}
                 emptyStateMessage={_(msg`No likes yet`)}
                 emptyStateIcon={HeartIcon}
+                mediaGrid={mediaGrid}
               />
             )
           : null}

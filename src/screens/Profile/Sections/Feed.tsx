@@ -37,6 +37,7 @@ interface FeedSectionProps {
   emptyStateButton?: EmptyStateButtonProps
   emptyStateIcon?: React.ComponentType<any> | React.ReactElement
   postFeedRef?: React.Ref<PostFeedRef>
+  mediaGrid?: boolean
 }
 
 export function ProfileFeedSection({
@@ -51,6 +52,7 @@ export function ProfileFeedSection({
   emptyStateButton,
   emptyStateIcon,
   postFeedRef,
+  mediaGrid = false,
 }: FeedSectionProps) {
   const {_} = useLingui()
   const queryClient = useQueryClient()
@@ -107,12 +109,15 @@ export function ProfileFeedSection({
         renderEmptyState={renderPostsEmpty}
         headerOffset={headerHeight}
         progressViewOffset={ios(0)}
-        renderEndOfFeed={isVideoFeed ? undefined : ProfileEndOfFeed}
+        renderEndOfFeed={
+          isVideoFeed && !mediaGrid ? undefined : ProfileEndOfFeed
+        }
         ignoreFilterFor={ignoreFilterFor}
         initialNumToRender={
           shouldUseAdjustedNumToRender ? adjustedInitialNumToRender : undefined
         }
         isVideoFeed={isVideoFeed}
+        mediaGrid={mediaGrid}
         ref={postFeedRef}
       />
       {(isScrolledDown || hasNew) && (

@@ -6,6 +6,8 @@ import {
   filterFeedSlices,
   filterSeenSlices,
   groupReposts,
+  groupRowsForMediaGrid,
+  MEDIA_GRID_ROW_TYPES,
 } from '#/components/feeds/postFeedUtils'
 
 function slice(
@@ -146,4 +148,60 @@ it('collects only the row’s own post URIs, not quoted ones', () => {
     'at://did:plc:a/app.bsky.feed.post/1',
     'at://did:plc:b/app.bsky.feed.post/1',
   ])
+})
+
+it('collapses post rows into media grid blocks and keeps only media', () => {
+  const withMedia = [slice('media-a'), slice('media-b')]
+  const withoutMedia = slice('text-only')
+  const rows = [
+    {type: 'sliceItem', key: 'a', slice: withMedia[0], indexInSlice: 0},
+    {type: 'interstitialFollows', key: 'interstitial'},
+    {type: 'sliceItem', key: 'c', slice: withoutMedia, indexInSlice: 0},
+    {type: 'sliceItem', key: 'b', slice: withMedia[1], indexInSlice: 0},
+    {type: 'loadMoreError', key: 'loadMoreError'},
+  ]
+  const grouped = groupRowsForMediaGrid(rows, {
+    maxPosts: 10,
+    sourceFeedUri: 'at://feed',
+    hasMedia: post => post.author.did !== 'did:plc:text-only',
+    keepRowTypes: MEDIA_GRID_ROW_TYPES,
+  })
+  expect(grouped.map(row => row.type)).toEqual([
+    'mediaGridRow',
+    'mediaGridRow',
+    'loadMoreError',
+  ])
+  /* The dropped interstitial still ends the block it sat above. */
+  expect(
+    grouped.flatMap(row =>
+      'items' in row && row.type === 'mediaGridRow'
+        ? row.items.map(item => item.post.uri)
+        : [],
+    ),
+  ).toEqual([
+    'at://did:plc:media-a/app.bsky.feed.post/1',
+    'at://did:plc:media-b/app.bsky.feed.post/1',
+  ])
+})
+
+it('splits media grid blocks at the post limit', () => {
+  const rows = Array.from({length: 7}, (_, i) => {
+    const s = slice(`post-${i}`)
+    return {type: 'sliceItem', key: `k${i}`, slice: s, indexInSlice: 0}
+  })
+  const grouped = groupRowsForMediaGrid(rows, {
+    maxPosts: 3,
+    sourceFeedUri: 'at://feed',
+    hasMedia: () => true,
+  })
+  expect(grouped.map(row => row.type)).toEqual([
+    'mediaGridRow',
+    'mediaGridRow',
+    'mediaGridRow',
+  ])
+  expect(
+    grouped.map(row =>
+      'items' in row && row.type === 'mediaGridRow' ? row.items.length : 0,
+    ),
+  ).toEqual([3, 3, 1])
 })

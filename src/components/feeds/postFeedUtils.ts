@@ -46,7 +46,7 @@ export function collectPdsProfileDidsForFeedRow(item: {
         collectPdsProfileDids(sliceItem.post, dids)
       }
     }
-  } else if (item.type === 'videoGridRow') {
+  } else if (item.type === 'videoGridRow' || item.type === 'mediaGridRow') {
     for (const sliceItem of (item.items ?? []) as FeedPostSliceItem[]) {
       collectPdsProfileDids(sliceItem.post, dids)
     }
@@ -73,12 +73,143 @@ export function collectPostUrisForFeedRow(item: {
         uris.push(sliceItem.post.uri)
       }
     }
-  } else if (item.type === 'videoGridRow') {
+  } else if (item.type === 'videoGridRow' || item.type === 'mediaGridRow') {
     for (const sliceItem of (item.items ?? []) as FeedPostSliceItem[]) {
       uris.push(sliceItem.post.uri)
     }
   }
   return uris
+}
+
+/**
+ * A masonry block of the media grid. Same shape as a video grid row, since
+ * both are a run of posts flattened into tiles.
+ */
+export type MediaGridFeedRow = {
+  type: 'mediaGridRow'
+  key: string
+  items: FeedPostSliceItem[]
+  sourceFeedUri: string
+  feedContexts: (string | undefined)[]
+  reqIds: (string | undefined)[]
+}
+
+type PostRowsSource = {
+  type: string
+  key: string
+  slice?: FeedPostSlice
+  indexInSlice?: number
+  items?: FeedPostSlice[] | FeedPostSliceItem[]
+  feedContexts?: (string | undefined)[]
+  reqIds?: (string | undefined)[]
+}
+
+/**
+ * Row types the media grid keeps. Everything else is editorial furniture -
+ * interstitials, the feed description, the show-less followup - which would
+ * break up a view that is meant to be nothing but media. Errors, the end of
+ * the feed and the pagination gap stay, since they are functional.
+ */
+export const MEDIA_GRID_ROW_TYPES: ReadonlySet<string> = new Set([
+  'error',
+  'empty',
+  'loadMoreError',
+  'refreshError',
+  'feedShutdownMsg',
+  'loading',
+  'mediaGridRowPlaceholder',
+  'gap',
+  'ageAssuranceBanner',
+])
+
+/**
+ * Collapses runs of post rows into media grid rows of at most `maxPosts`
+ * posts, dropping posts without media. Every other row - interstitials,
+ * errors, the loading placeholder - stays where it was, which is what splits
+ * the grid into blocks.
+ *
+ * With `keepRowTypes`, only rows of those types survive. The grid view drops
+ * everything else, so an interstitial or a feed description cannot take over
+ * a page that is meant to be only media.
+ */
+export function groupRowsForMediaGrid<T extends PostRowsSource>(
+  rows: T[],
+  {
+    maxPosts,
+    sourceFeedUri,
+    hasMedia,
+    keepRowTypes,
+  }: {
+    maxPosts: number
+    sourceFeedUri: string
+    hasMedia: (post: app.bsky.feed.defs.PostView) => boolean
+    keepRowTypes?: ReadonlySet<string>
+  },
+): (T | MediaGridFeedRow)[] {
+  const out: (T | MediaGridFeedRow)[] = []
+  let buffer: Pick<
+    MediaGridFeedRow,
+    'items' | 'feedContexts' | 'reqIds'
+  > | null = null
+
+  const add = (
+    item: FeedPostSliceItem | undefined,
+    feedContext: string | undefined,
+    reqId: string | undefined,
+  ) => {
+    if (!item || !hasMedia(item.post)) return
+    buffer ??= {items: [], feedContexts: [], reqIds: []}
+    buffer.items.push(item)
+    buffer.feedContexts.push(feedContext)
+    buffer.reqIds.push(reqId)
+  }
+  const flush = () => {
+    if (!buffer) return
+    out.push({
+      type: 'mediaGridRow',
+      key: `mediaGridRow-${buffer.items[0]._reactKey}`,
+      items: buffer.items,
+      sourceFeedUri,
+      feedContexts: buffer.feedContexts,
+      reqIds: buffer.reqIds,
+    })
+    buffer = null
+  }
+  const addAndMaybeFlush = (
+    item: FeedPostSliceItem | undefined,
+    feedContext: string | undefined,
+    reqId: string | undefined,
+  ) => {
+    add(item, feedContext, reqId)
+    if (buffer && buffer.items.length >= maxPosts) flush()
+  }
+
+  for (const row of rows) {
+    if (row.type === 'sliceItem' && row.slice) {
+      const slice = row.slice
+      addAndMaybeFlush(
+        slice.items[row.indexInSlice ?? 0],
+        slice.feedContext,
+        slice.reqId,
+      )
+    } else if (row.type === 'reposts') {
+      for (const slice of (row.items ?? []) as FeedPostSlice[]) {
+        addAndMaybeFlush(slice.items[0], slice.feedContext, slice.reqId)
+      }
+    } else if (row.type === 'videoGridRow') {
+      const items = (row.items ?? []) as FeedPostSliceItem[]
+      for (let i = 0; i < items.length; i++) {
+        addAndMaybeFlush(items[i], row.feedContexts?.[i], row.reqIds?.[i])
+      }
+    } else {
+      flush()
+      if (!keepRowTypes || keepRowTypes.has(row.type)) {
+        out.push(row)
+      }
+    }
+  }
+  flush()
+  return out
 }
 
 export type FeedPostSliceOrGroup =

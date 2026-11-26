@@ -25,6 +25,7 @@ import {atoms as a, useBreakpoints, useTheme, web} from '#/alf'
 import {Button, ButtonIcon, ButtonText} from '#/components/Button'
 import * as Dialog from '#/components/Dialog'
 import {Divider} from '#/components/Divider'
+import {MediaGridToggle} from '#/components/feeds/MediaGridToggle'
 import {ArrowOutOfBoxModified_Stroke2_Corner2_Rounded as ShareIcon} from '#/components/icons/ArrowOutOfBox'
 import {CircleInfo_Stroke2_Corner0_Rounded as CircleInfoIcon} from '#/components/icons/CircleInfo'
 import {DotGrid3x1_Stroke2_Corner0_Rounded as EllipsisIcon} from '#/components/icons/DotGrid'
@@ -40,6 +41,7 @@ import {PlusLarge_Stroke2_Corner0_Rounded as PlusIcon} from '#/components/icons/
 import {TimesLarge_Stroke2_Corner0_Rounded as XIcon} from '#/components/icons/Times'
 import {Trash_Stroke2_Corner0_Rounded as TrashIcon} from '#/components/icons/Trash'
 import * as Layout from '#/components/Layout'
+import {HEADER_SLOT_SIZE} from '#/components/Layout/const'
 import {InlineLinkText} from '#/components/Link'
 import * as Menu from '#/components/Menu'
 import {
@@ -337,68 +339,73 @@ export function CustomFeedHeader({
             )}
           </Layout.Header.Content>
 
-          {!isTrending && hasSession ? (
-            <Layout.Header.Slot>
-              {isPinned ? (
-                <Menu.Root>
-                  <Menu.Trigger label={l`Open feed options menu`}>
-                    {({props}) => {
-                      return (
-                        <Button
-                          {...props}
-                          label={l`Open feed options menu`}
-                          size="small"
-                          variant="ghost"
-                          shape="square"
-                          color="secondary">
-                          <PinFilledIcon
-                            size="lg"
-                            fill={t.palette.primary_500}
-                          />
-                        </Button>
-                      )
-                    }}
-                  </Menu.Trigger>
+          <View style={[a.z_50, a.flex_row, a.align_center, a.gap_2xs]}>
+            <MediaGridToggle />
+            {!isTrending && hasSession ? (
+              <View style={{width: HEADER_SLOT_SIZE}}>
+                {isPinned ? (
+                  <Menu.Root>
+                    <Menu.Trigger label={l`Open feed options menu`}>
+                      {({props}) => {
+                        return (
+                          <Button
+                            {...props}
+                            label={l`Open feed options menu`}
+                            size="small"
+                            variant="ghost"
+                            shape="square"
+                            color="secondary">
+                            <PinFilledIcon
+                              size="lg"
+                              fill={t.palette.primary_500}
+                            />
+                          </Button>
+                        )
+                      }}
+                    </Menu.Trigger>
 
-                  <Menu.Outer>
-                    <Menu.Item
-                      disabled={isFeedStateChangePending}
-                      label={l`Unpin from home`}
-                      onPress={() => void onTogglePinned()}>
-                      <Menu.ItemText>{l`Unpin from home`}</Menu.ItemText>
-                      <Menu.ItemIcon icon={XIcon} position="right" />
-                    </Menu.Item>
-                    <Menu.Item
-                      disabled={isFeedStateChangePending}
-                      label={
-                        isSaved ? l`Remove from my feeds` : l`Save to my feeds`
-                      }
-                      onPress={() => void onToggleSaved()}>
-                      <Menu.ItemText>
-                        {isSaved
-                          ? l`Remove from my feeds`
-                          : l`Save to my feeds`}
-                      </Menu.ItemText>
-                      <Menu.ItemIcon
-                        icon={isSaved ? TrashIcon : PlusIcon}
-                        position="right"
-                      />
-                    </Menu.Item>
-                  </Menu.Outer>
-                </Menu.Root>
-              ) : (
-                <Button
-                  label={l`Pin to Home`}
-                  size="small"
-                  variant="ghost"
-                  shape="square"
-                  color="secondary"
-                  onPress={() => void onTogglePinned()}>
-                  <ButtonIcon icon={PinIcon} size="lg" />
-                </Button>
-              )}
-            </Layout.Header.Slot>
-          ) : null}
+                    <Menu.Outer>
+                      <Menu.Item
+                        disabled={isFeedStateChangePending}
+                        label={l`Unpin from home`}
+                        onPress={() => void onTogglePinned()}>
+                        <Menu.ItemText>{l`Unpin from home`}</Menu.ItemText>
+                        <Menu.ItemIcon icon={XIcon} position="right" />
+                      </Menu.Item>
+                      <Menu.Item
+                        disabled={isFeedStateChangePending}
+                        label={
+                          isSaved
+                            ? l`Remove from my feeds`
+                            : l`Save to my feeds`
+                        }
+                        onPress={() => void onToggleSaved()}>
+                        <Menu.ItemText>
+                          {isSaved
+                            ? l`Remove from my feeds`
+                            : l`Save to my feeds`}
+                        </Menu.ItemText>
+                        <Menu.ItemIcon
+                          icon={isSaved ? TrashIcon : PlusIcon}
+                          position="right"
+                        />
+                      </Menu.Item>
+                    </Menu.Outer>
+                  </Menu.Root>
+                ) : (
+                  <Button
+                    label={l`Pin to Home`}
+                    size="small"
+                    variant="ghost"
+                    shape="square"
+                    color="secondary"
+                    onPress={() => void onTogglePinned()}>
+                    <ButtonIcon icon={PinIcon} size="lg" />
+                  </Button>
+                )}
+              </View>
+            ) : null}
+          </View>
         </Layout.Header.Outer>
       </Layout.Center>
       <Dialog.Outer

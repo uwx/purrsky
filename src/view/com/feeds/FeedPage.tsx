@@ -19,6 +19,7 @@ import {type CommonNavigatorParams} from '#/lib/routes/types'
 import {userStyle} from '#/lib/userstyles'
 import {listenSoftReset} from '#/state/events'
 import {useSetHomeBadge} from '#/state/home-badge'
+import {useMediaGridView} from '#/state/preferences/media-grid-view'
 import {type FeedSourceInfo} from '#/state/queries/feed'
 import {
   type FeedDescriptor,
@@ -88,6 +89,7 @@ export function FeedPage({
   }, [feedInfo])
   const t = useTheme()
   const inDeck = useIsInDeckColumn()
+  const mediaGridView = useMediaGridView()
 
   useEffect(() => {
     if (isPageFocused) {
@@ -184,6 +186,7 @@ export function FeedPage({
             headerOffset={headerOffset}
             savedFeedConfig={savedFeedConfig}
             isVideoFeed={isVideoFeed}
+            mediaGrid={mediaGridView}
           />
         </FeedFeedbackProvider>
       </MainScrollProvider>

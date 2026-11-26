@@ -49,6 +49,7 @@ import {Provider as LanguagesProvider} from './languages'
 import {Provider as LargeAltBadgeProvider} from './large-alt-badge'
 import {Provider as LoadSmallPNGsProvider} from './load-small-pngs'
 import {Provider as LocalAltTextProvider} from './local-alt-text'
+import {Provider as MediaGridViewProvider} from './media-grid-view'
 import {MetricsDisplayPreferencesProvider} from './metrics-display-preference'
 import {Provider as NameOutlinesProvider} from './name-outlines'
 import {Provider as NoDiscoverProvider} from './no-discover-fallback'
@@ -146,6 +147,7 @@ export {
   useLocalAltTextEnabled,
   useSetLocalAltTextEnabled,
 } from './local-alt-text'
+export {useMediaGridView, useSetMediaGridView} from './media-grid-view'
 export {useSetShowNameOutlines, useShowNameOutlines} from './name-outlines'
 export {useOmitViaField, useSetOmitViaField} from './omit-via-field'
 export {
@@ -265,75 +267,77 @@ export function Provider({children}: PropsWithChildren<{}>) {
                                                                                                           <HideUnreplyablePostsProvider>
                                                                                                             <SeenPostsProvider>
                                                                                                               <CompactPostsProvider>
-                                                                                                                <EnableSquareAvatarsProvider>
-                                                                                                                  <EnableSquareButtonsProvider>
-                                                                                                                    <AutoCompactAccountSwitcherProvider>
-                                                                                                                      <CompactAccountSwitcherProvider>
-                                                                                                                        <ShowViaClientProvider>
-                                                                                                                          <HideDisplayNamesProvider>
-                                                                                                                            <SixSevenCelebrationProvider>
-                                                                                                                              <PostNameReplacementProvider>
-                                                                                                                                <DisableVerifyEmailReminderProvider>
-                                                                                                                                  <TranslationServicePreferenceProvider>
-                                                                                                                                    <OpenRouterProvider>
-                                                                                                                                      <DisableComposerPromptProvider>
-                                                                                                                                        <DisableTopOfFeedButtonProvider>
-                                                                                                                                          <DiscoverContextEnabledProvider>
-                                                                                                                                            <OmitViaFieldProvider>
-                                                                                                                                              <TidSuffixProvider>
-                                                                                                                                                <SlingshotInstanceProvider>
-                                                                                                                                                  <TokimekiInstanceProvider>
-                                                                                                                                                    <DisableInfiniteScrollProvider>
-                                                                                                                                                      <HideBluemojiReactionsProvider>
-                                                                                                                                                        <HideOwnFictionkinBadgeProvider>
-                                                                                                                                                          <HideQuotesOfBlockedAccountsProvider>
-                                                                                                                                                            <ReplyIconIndicatorsProvider>
-                                                                                                                                                              <ShowPostTagsProvider>
-                                                                                                                                                                <EmojiFontProvider>
-                                                                                                                                                                  <PasteToLinkEnabledProvider>
-                                                                                                                                                                    <TagSearchInstanceProvider>
-                                                                                                                                                                      <DeckLayoutProvider>
-                                                                                                                                                                        <ShowThreadPostNumbersProvider>
-                                                                                                                                                                          <NameOutlinesProvider>
-                                                                                                                                                                            <CustomNameStylesProvider>
-                                                                                                                                                                              <ProfileThemesProvider>
-                                                                                                                                                                                <LocalAltTextProvider>
-                                                                                                                                                                                  {
-                                                                                                                                                                                    children
-                                                                                                                                                                                  }
-                                                                                                                                                                                </LocalAltTextProvider>
-                                                                                                                                                                              </ProfileThemesProvider>
-                                                                                                                                                                            </CustomNameStylesProvider>
-                                                                                                                                                                          </NameOutlinesProvider>
-                                                                                                                                                                        </ShowThreadPostNumbersProvider>
-                                                                                                                                                                      </DeckLayoutProvider>
-                                                                                                                                                                    </TagSearchInstanceProvider>
-                                                                                                                                                                  </PasteToLinkEnabledProvider>
-                                                                                                                                                                </EmojiFontProvider>
-                                                                                                                                                              </ShowPostTagsProvider>
-                                                                                                                                                            </ReplyIconIndicatorsProvider>
-                                                                                                                                                          </HideQuotesOfBlockedAccountsProvider>
-                                                                                                                                                        </HideOwnFictionkinBadgeProvider>
-                                                                                                                                                      </HideBluemojiReactionsProvider>
-                                                                                                                                                    </DisableInfiniteScrollProvider>
-                                                                                                                                                  </TokimekiInstanceProvider>
-                                                                                                                                                </SlingshotInstanceProvider>
-                                                                                                                                              </TidSuffixProvider>
-                                                                                                                                            </OmitViaFieldProvider>
-                                                                                                                                          </DiscoverContextEnabledProvider>
-                                                                                                                                        </DisableTopOfFeedButtonProvider>
-                                                                                                                                      </DisableComposerPromptProvider>
-                                                                                                                                    </OpenRouterProvider>
-                                                                                                                                  </TranslationServicePreferenceProvider>
-                                                                                                                                </DisableVerifyEmailReminderProvider>
-                                                                                                                              </PostNameReplacementProvider>
-                                                                                                                            </SixSevenCelebrationProvider>
-                                                                                                                          </HideDisplayNamesProvider>
-                                                                                                                        </ShowViaClientProvider>
-                                                                                                                      </CompactAccountSwitcherProvider>
-                                                                                                                    </AutoCompactAccountSwitcherProvider>
-                                                                                                                  </EnableSquareButtonsProvider>
-                                                                                                                </EnableSquareAvatarsProvider>
+                                                                                                                <MediaGridViewProvider>
+                                                                                                                  <EnableSquareAvatarsProvider>
+                                                                                                                    <EnableSquareButtonsProvider>
+                                                                                                                      <AutoCompactAccountSwitcherProvider>
+                                                                                                                        <CompactAccountSwitcherProvider>
+                                                                                                                          <ShowViaClientProvider>
+                                                                                                                            <HideDisplayNamesProvider>
+                                                                                                                              <SixSevenCelebrationProvider>
+                                                                                                                                <PostNameReplacementProvider>
+                                                                                                                                  <DisableVerifyEmailReminderProvider>
+                                                                                                                                    <TranslationServicePreferenceProvider>
+                                                                                                                                      <OpenRouterProvider>
+                                                                                                                                        <DisableComposerPromptProvider>
+                                                                                                                                          <DisableTopOfFeedButtonProvider>
+                                                                                                                                            <DiscoverContextEnabledProvider>
+                                                                                                                                              <OmitViaFieldProvider>
+                                                                                                                                                <TidSuffixProvider>
+                                                                                                                                                  <SlingshotInstanceProvider>
+                                                                                                                                                    <TokimekiInstanceProvider>
+                                                                                                                                                      <DisableInfiniteScrollProvider>
+                                                                                                                                                        <HideBluemojiReactionsProvider>
+                                                                                                                                                          <HideOwnFictionkinBadgeProvider>
+                                                                                                                                                            <HideQuotesOfBlockedAccountsProvider>
+                                                                                                                                                              <ReplyIconIndicatorsProvider>
+                                                                                                                                                                <ShowPostTagsProvider>
+                                                                                                                                                                  <EmojiFontProvider>
+                                                                                                                                                                    <PasteToLinkEnabledProvider>
+                                                                                                                                                                      <TagSearchInstanceProvider>
+                                                                                                                                                                        <DeckLayoutProvider>
+                                                                                                                                                                          <ShowThreadPostNumbersProvider>
+                                                                                                                                                                            <NameOutlinesProvider>
+                                                                                                                                                                              <CustomNameStylesProvider>
+                                                                                                                                                                                <ProfileThemesProvider>
+                                                                                                                                                                                  <LocalAltTextProvider>
+                                                                                                                                                                                    {
+                                                                                                                                                                                      children
+                                                                                                                                                                                    }
+                                                                                                                                                                                  </LocalAltTextProvider>
+                                                                                                                                                                                </ProfileThemesProvider>
+                                                                                                                                                                              </CustomNameStylesProvider>
+                                                                                                                                                                            </NameOutlinesProvider>
+                                                                                                                                                                          </ShowThreadPostNumbersProvider>
+                                                                                                                                                                        </DeckLayoutProvider>
+                                                                                                                                                                      </TagSearchInstanceProvider>
+                                                                                                                                                                    </PasteToLinkEnabledProvider>
+                                                                                                                                                                  </EmojiFontProvider>
+                                                                                                                                                                </ShowPostTagsProvider>
+                                                                                                                                                              </ReplyIconIndicatorsProvider>
+                                                                                                                                                            </HideQuotesOfBlockedAccountsProvider>
+                                                                                                                                                          </HideOwnFictionkinBadgeProvider>
+                                                                                                                                                        </HideBluemojiReactionsProvider>
+                                                                                                                                                      </DisableInfiniteScrollProvider>
+                                                                                                                                                    </TokimekiInstanceProvider>
+                                                                                                                                                  </SlingshotInstanceProvider>
+                                                                                                                                                </TidSuffixProvider>
+                                                                                                                                              </OmitViaFieldProvider>
+                                                                                                                                            </DiscoverContextEnabledProvider>
+                                                                                                                                          </DisableTopOfFeedButtonProvider>
+                                                                                                                                        </DisableComposerPromptProvider>
+                                                                                                                                      </OpenRouterProvider>
+                                                                                                                                    </TranslationServicePreferenceProvider>
+                                                                                                                                  </DisableVerifyEmailReminderProvider>
+                                                                                                                                </PostNameReplacementProvider>
+                                                                                                                              </SixSevenCelebrationProvider>
+                                                                                                                            </HideDisplayNamesProvider>
+                                                                                                                          </ShowViaClientProvider>
+                                                                                                                        </CompactAccountSwitcherProvider>
+                                                                                                                      </AutoCompactAccountSwitcherProvider>
+                                                                                                                    </EnableSquareButtonsProvider>
+                                                                                                                  </EnableSquareAvatarsProvider>
+                                                                                                                </MediaGridViewProvider>
                                                                                                               </CompactPostsProvider>
                                                                                                             </SeenPostsProvider>
                                                                                                           </HideUnreplyablePostsProvider>

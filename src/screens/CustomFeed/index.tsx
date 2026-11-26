@@ -12,6 +12,7 @@ import {type CommonNavigatorParams} from '#/lib/routes/types'
 import {cleanError} from '#/lib/strings/errors'
 import {makeRecordUri} from '#/lib/strings/url-helpers'
 import {listenSoftReset} from '#/state/events'
+import {useMediaGridView} from '#/state/preferences/media-grid-view'
 import {
   type FeedSourceFeedInfo,
   useFeedSourceInfoQuery,
@@ -136,6 +137,7 @@ export function CustomFeedScreenInner({
   const {openComposer} = useOpenComposer()
   const isScreenFocused = useIsFocused()
   const t = useTheme()
+  const mediaGridView = useMediaGridView()
 
   useSetTitle(feedInfo?.displayName)
 
@@ -201,6 +203,7 @@ export function CustomFeedScreenInner({
           onScrolledDownChange={setIsScrolledDown}
           renderEmptyState={renderPostsEmpty}
           isVideoFeed={isVideoFeed}
+          mediaGrid={mediaGridView}
         />
       </FeedFeedbackProvider>
       {(isScrolledDown || hasNew) && (

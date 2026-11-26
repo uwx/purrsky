@@ -23,6 +23,10 @@ export interface TabBarProps {
 
   onSelect?: (index: number) => void
   onPressSelected?: (index: number) => void
+  /**
+   * Rendered at the right end of the tab bar, after the tabs.
+   */
+  trailing?: React.ReactNode
 
   /**
    * The drag-following indicator and transparent background only exist in
@@ -43,6 +47,7 @@ export function TabBar({
   items,
   unread,
   align = 'center',
+  trailing,
   onSelect,
   onPressSelected,
 }: TabBarProps) {
@@ -186,6 +191,11 @@ export function TabBar({
           )
         })}
       </DraggableScrollView>
+      {trailing ? (
+        <View style={[a.flex_shrink_0, a.justify_center, a.pl_2xs]}>
+          {trailing}
+        </View>
+      ) : null}
       <View style={[t.atoms.border_contrast_low, styles.outerBottomBorder]} />
     </View>
   )

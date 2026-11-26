@@ -57,6 +57,8 @@ export interface PagerWithHeaderProps {
   allowHeaderOverScroll?: boolean
   /** Extra vertical clipping bounds for a header that must clip horizontally. */
   headerOverflowInset?: number
+  /** Rendered at the right end of the tab bar, after the tabs. */
+  tabBarTrailing?: React.ReactNode
 }
 export function PagerWithHeader({
   ref,
@@ -70,6 +72,7 @@ export function PagerWithHeader({
   onCurrentPageSelected,
   allowHeaderOverScroll,
   headerOverflowInset,
+  tabBarTrailing,
 }: PagerWithHeaderProps) {
   const [currentPage, setCurrentPage] = useState(initialPage ?? 0)
   const [tabBarHeight, setTabBarHeight] = useState(0)
@@ -112,6 +115,7 @@ export function PagerWithHeader({
             allowHeaderOverScroll={allowHeaderOverScroll}
             dragProgress={props.dragProgress}
             dragState={props.dragState}
+            tabBarTrailing={tabBarTrailing}
           />
         </PagerHeaderProvider>
       )
@@ -129,6 +133,7 @@ export function PagerWithHeader({
       testID,
       allowHeaderOverScroll,
       headerOverflowInset,
+      tabBarTrailing,
     ],
   )
 
@@ -241,6 +246,7 @@ let PagerTabBar = ({
   headerOverflowInset,
   dragProgress,
   dragState,
+  tabBarTrailing,
 }: {
   currentPage: number
   headerOnlyHeight: number
@@ -262,6 +268,7 @@ let PagerTabBar = ({
   headerOverflowInset?: number
   dragProgress: SharedValue<number>
   dragState: SharedValue<'idle' | 'dragging' | 'settling'>
+  tabBarTrailing?: React.ReactNode
 }): React.ReactNode => {
   const t = useTheme()
   const [minimumHeaderHeight, setMinimumHeaderHeight] = useState(0)
@@ -365,6 +372,7 @@ let PagerTabBar = ({
           onPressSelected={onCurrentPageSelected}
           dragProgress={dragProgress}
           dragState={dragState}
+          trailing={tabBarTrailing}
         />
       </View>
     </Animated.View>

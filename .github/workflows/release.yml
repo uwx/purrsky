@@ -461,6 +461,8 @@ jobs:
       # Same as `just intl:build`: the fork has no nightly catalog job, so the
       # committed .po files drift and a build would otherwise ship message IDs.
       - name: Build translations
+        env:
+          THREADS_WORKER_INIT_TIMEOUT: 60000
         run: pnpm intl:build
 
       # ios/ is gitignored, so the native project is generated from

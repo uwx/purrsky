@@ -48,6 +48,19 @@ it('writes v1 facets accepted by Bluemoji and Bluesky post schemas', () => {
   ).toBe(true)
 })
 
+it('accepts the facet emitted by the Wafrn bridge', () => {
+  const facet = {
+    $type: 'blue.moji.richtext.facet',
+    did: 'did:plc:vp5wiuodmvgxukajqf5egj3k',
+    name: ':neocat_googly_shocked_256:',
+    formats: {
+      $type: 'blue.moji.richtext.facet#formats_v1',
+      png_128: 'bafkreiat5bwxpkdjbarl5t6v44isxo7bmolry7ofptkf7fr6hfkf4i5uem',
+    },
+  }
+  expect(getBluemojiFacet(facet)).toMatchObject(facet)
+})
+
 it('uses distinct fallback aliases for collisions and reuses prior selections', () => {
   const refs = {
     [item.record.name]: {

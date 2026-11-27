@@ -13,9 +13,15 @@ Everything inside someone else's record is self-attested: a facet's `did`,
 `name`, `formats`, `alt`, `adultOnly` and labels are whatever the poster's client
 wrote, and nothing validates them. So:
 
-- inline emoji render only after `fetchBluemojiItem` reads the
+- inline emoji normally render only after `fetchBluemojiItem` reads the
   `blue.moji.collection.item` back from its owner's PDS, and images and labels
   come from that record, never from the facet;
+- Wafrn bridge accounts are an exception: they upload the image to the bridged
+  account and put its CID in the post facet without creating a collection item.
+  Colon-wrapped aliases in these posts render as unverified post media. The
+  source emoji's labels and identity cannot be verified; facet claims of labels
+  or adult content are left as text. This has the same trust boundary as an
+  ordinary image attached to the post;
 - picker search results are claims too, and only become tappable once the owning
   PDS confirms them;
 - reaction `emojiRef`s from moji.blue's AppView are already rebuilt from the

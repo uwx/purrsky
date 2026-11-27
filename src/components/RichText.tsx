@@ -30,6 +30,7 @@ import {ProfileHoverCard} from '#/components/ProfileHoverCard'
 import {RichTextTag} from '#/components/RichTextTag'
 import {Text, type TextProps} from '#/components/Typography'
 import {IS_ANDROID, IS_NATIVE} from '#/env'
+import {BridgedBluemoji} from '#/features/bluemoji/BridgedBluemoji'
 import {InlineBluemoji} from '#/features/bluemoji/InlineBluemoji'
 import {isOnlyEmojiRichText} from '#/features/bluemoji/richText'
 import {getBluemojiFacet} from '#/features/bluemoji/util'
@@ -39,6 +40,25 @@ import {app} from '#/lexicons'
 import * as bsky from '#/types/bsky'
 
 const WORD_WRAP = {wordWrap: 1}
+
+function bridgedEmojiAsset(
+  emoji: ReturnType<typeof getBluemojiFacet>,
+  authorHandle?: string,
+) {
+  if (
+    !authorHandle?.toLowerCase().endsWith('.at.app.wafrn.net') ||
+    !emoji ||
+    !/^:[a-zA-Z0-9_+-]+:$/.test(emoji.name) ||
+    !/^did:[a-z0-9]+:[a-zA-Z0-9._:%-]+$/.test(emoji.did) ||
+    emoji.adultOnly ||
+    emoji.labels
+  ) return undefined
+  const formats = emoji.formats as Record<string, unknown> | undefined
+  const cid = ['webp_128', 'gif_128', 'apng_128', 'png_128']
+    .map(slot => formats?.[slot])
+    .find(value => typeof value === 'string' && /^[a-zA-Z0-9]+$/.test(value))
+  return typeof cid === 'string' ? {did: emoji.did, cid} : undefined
+}
 
 export type RichTextProps = TextStyleProp &
   Pick<TextProps, 'selectable' | 'onLayout' | 'onTextLayout'> & {
@@ -192,6 +212,16 @@ export function RichText({
   let key = 0
   if (htmlSegments) {
     const mentionDids = new Map<string, string>()
+    const bridgedEmoji = new Map<string, {did: string; cid: string}>()
+    for (const piece of piecesOf(richText.text, facets)) {
+      for (const feature of piece.features) {
+        const emoji = getBluemojiFacet(feature)
+        const asset = bridgedEmojiAsset(emoji, authorHandle)
+        if (asset && emoji?.name === piece.text) {
+          bridgedEmoji.set(emoji.name, asset)
+        }
+      }
+    }
     for (const segment of richText.segments()) {
       if (
         segment.mention &&
@@ -201,6 +231,35 @@ export function RichText({
       }
     }
     for (const segment of htmlSegments) {
+      let content: React.ReactNode = segment.text
+      if (!segment.link && !segment.mention && !segment.tag && !segment.code && bridgedEmoji.size) {
+        const matches = [...segment.text.matchAll(/:[a-zA-Z0-9_+-]+:/g)]
+        const children: React.ReactNode[] = []
+        let offset = 0
+        for (const match of matches) {
+          const emoji = bridgedEmoji.get(match[0])
+          if (!emoji) continue
+          children.push(segment.text.slice(offset, match.index))
+          children.push(
+            <BridgedBluemoji
+              key={match.index}
+              {...emoji}
+              name={match[0]}
+              size={customEmojiSize}
+              baselineOffset={
+                IS_NATIVE && nativeEmojiMeasurement?.fontSize === nativeEmojiFontSize
+                  ? nativeEmojiMeasurement.descender
+                  : undefined
+              }
+            />,
+          )
+          offset = match.index + match[0].length
+        }
+        if (children.length) {
+          children.push(segment.text.slice(offset))
+          content = children
+        }
+      }
       const did =
         segment.mention && (segment.did ?? mentionDids.get(segment.text))
       if (!disableLinks && did) {
@@ -268,11 +327,11 @@ export function RichText({
                 fontFamily: IS_ANDROID ? 'monospace' : 'Courier New',
               },
             ]}>
-            {segment.text}
+            {content}
           </Text>,
         )
       } else {
-        els.push(segment.text)
+        els.push(content)
       }
       key++
     }
@@ -519,20 +578,38 @@ export function RichText({
         while (pieces[i + 1]?.features.includes(bluemojiFeature)) {
           fallbackText += pieces[++i].text
         }
+        const bridgedAsset =
+          fallbackText === bluemoji.name
+            ? bridgedEmojiAsset(bluemoji, authorHandle)
+            : undefined
         els.push(
-          <InlineBluemoji
-            key={key}
-            interactive={!IS_NATIVE || enableEmojiDetails}
-            claim={bluemoji}
-            fallbackText={fallbackText}
-            size={customEmojiSize}
-            baselineOffset={
-              IS_NATIVE &&
-              nativeEmojiMeasurement?.fontSize === nativeEmojiFontSize
-                ? nativeEmojiMeasurement.descender
-                : undefined
-            }
-          />,
+          bridgedAsset ? (
+            <BridgedBluemoji
+              key={key}
+              {...bridgedAsset}
+              name={fallbackText}
+              size={customEmojiSize}
+              baselineOffset={
+                IS_NATIVE && nativeEmojiMeasurement?.fontSize === nativeEmojiFontSize
+                  ? nativeEmojiMeasurement.descender
+                  : undefined
+              }
+            />
+          ) : (
+            <InlineBluemoji
+              key={key}
+              interactive={!IS_NATIVE || enableEmojiDetails}
+              claim={bluemoji}
+              fallbackText={fallbackText}
+              size={customEmojiSize}
+              baselineOffset={
+                IS_NATIVE &&
+                nativeEmojiMeasurement?.fontSize === nativeEmojiFontSize
+                  ? nativeEmojiMeasurement.descender
+                  : undefined
+              }
+            />
+          ),
         )
       } else {
         els.push(

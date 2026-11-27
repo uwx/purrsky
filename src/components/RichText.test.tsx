@@ -96,6 +96,12 @@ jest.mock('#/components/Typography', () => {
   const {Text} = require('react-native')
   return {Text, default: Text}
 })
+jest.mock('#/features/bluemoji/BridgedBluemoji', () => ({
+  BridgedBluemoji: ({name}: {name: string}) => {
+    const {Text} = require('react-native')
+    return <Text testID="bridgedEmoji">{name}</Text>
+  },
+}))
 jest.mock('#/features/bluemoji/InlineBluemoji', () => ({
   InlineBluemoji: (props: {
     fallbackText: string
@@ -458,6 +464,32 @@ it('composes formatting with mentions, tags and a single split bluemoji', () => 
   expect(mockEmojiCalls).toEqual([
     expect.objectContaining({fallbackText: ':wave:', size: 20}),
   ])
+})
+
+it('renders Wafrn emoji facets in formatted HTML and plain text', () => {
+  const name = ':neocat_googly_shocked_256:'
+  const text = `Hello ${name}`
+  const value = withFacets(text, [{
+    start: 6,
+    end: text.length,
+    features: [{
+      $type: 'blue.moji.richtext.facet',
+      did: 'did:plc:alice',
+      name,
+      formats: {$type: 'blue.moji.richtext.facet#formats_v1', png_128: 'bafk123'},
+    } as unknown as Unknown$TypedObject],
+  }])
+  const screen = render(
+    <RichText authorHandle="alice.at.app.wafrn.net" value={value} htmlSegments={[
+      {text: 'Hello '},
+      {text: `${name} ${name}`, bold: true},
+      {text: name, code: true},
+      {text: name, link: 'https://example.com'},
+    ]} />,
+  )
+  expect(screen.getAllByTestId('bridgedEmoji')).toHaveLength(2)
+  screen.rerender(<RichText authorHandle="alice.at.app.wafrn.net" value={value} />)
+  expect(screen.getAllByTestId('bridgedEmoji')).toHaveLength(1)
 })
 
 it('hides spoiler text from view and accessibility while retaining its layout', () => {

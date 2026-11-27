@@ -83,7 +83,8 @@ export function PetLabelSettingsScreen({}: Props) {
       },
       {
         onSuccess() {
-          void queryClient.invalidateQueries({queryKey: [POST_FEED_RQKEY_ROOT]})
+          // refetch only the first page of each feed
+          void queryClient.resetQueries({queryKey: [POST_FEED_RQKEY_ROOT]})
           void queryClient.invalidateQueries({queryKey: [postThreadQueryKeyRoot]})
         },
       },

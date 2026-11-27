@@ -123,7 +123,8 @@ export function FictionkinBadgeSettingsScreen({}: Props) {
         onSuccess() {
           setTouched(false)
           setSavedOnce(true)
-          void queryClient.invalidateQueries({
+          // refetch only the first page of each feed
+          void queryClient.resetQueries({
             queryKey: [POST_FEED_RQKEY_ROOT],
           })
           void queryClient.invalidateQueries({

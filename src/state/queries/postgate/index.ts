@@ -8,7 +8,7 @@ import {isRecordNotFoundError} from '#/lib/xrpc-error'
 import {logger} from '#/logger'
 import {updatePostShadow} from '#/state/cache/post-shadow'
 import {STALE} from '#/state/queries'
-import {useGetPosts} from '#/state/queries/post'
+import {useGetPost} from '#/state/queries/post'
 import {
   createMaybeDetachedQuoteEmbed,
   createPostgateRecord,
@@ -170,7 +170,7 @@ export function useWritePostgateMutation() {
 export function useToggleQuoteDetachmentMutation() {
   const pdsClient = usePdsClient()
   const queryClient = useQueryClient()
-  const getPosts = useGetPosts()
+  const getPost = useGetPost()
   const prevEmbed = useRef<app.bsky.feed.defs.PostView['embed']>(undefined)
 
   return useMutation({
@@ -224,7 +224,9 @@ export function useToggleQuoteDetachmentMutation() {
     async onSuccess(_data, {post, quoteUri, action}) {
       if (action === 'reattach') {
         try {
-          const [quote] = await getPosts({uris: [quoteUri]})
+          // fetch as a single post so this writes a PostView, not an array, to
+          // the single-post cache entry keyed by `quoteUri`
+          const quote = await getPost({uri: quoteUri})
           updatePostShadow(queryClient, post.uri, {
             embed: createMaybeDetachedQuoteEmbed({
               post,

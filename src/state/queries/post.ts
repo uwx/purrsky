@@ -120,26 +120,6 @@ export function useGetPost() {
   )
 }
 
-export function useGetPosts() {
-  const queryClient = useQueryClient()
-  const client = useAppviewClient()
-  return useCallback(
-    async ({uris}: {uris: string[]}) => {
-      return queryClient.fetchQuery({
-        queryKey: RQKEY(uris.join(',') || ''),
-        async queryFn() {
-          const data = await client.call(app.bsky.feed.getPosts, {
-            uris: uris as AtUriString[],
-          })
-          // See the note on `fetchPost` about the view shapes.
-          return data.posts
-        },
-      })
-    },
-    [queryClient, client],
-  )
-}
-
 export function usePostLikeMutationQueue(
   post: Shadow<app.bsky.feed.defs.PostView>,
   viaRepost: {uri: string; cid: string} | undefined,

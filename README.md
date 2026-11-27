@@ -31,6 +31,7 @@ alt="Get it on Obtainium" height="54" /></a> -->
 - Read your chat threads with deleted/deactivated accounts
 - Unique repost icons in notifications
 - Repost carousels in following feed
+- Masonry media opens a fullscreen viewer with swipeable multi-image posts. Desktop puts interaction controls inline with the previous/next image arrows and shows the real post thread and replies beside the image, without repeating the main post's attachments; phones show "View post" inline with the arrows and interaction controls below. Close with Escape, Back, the close button, or a tap on the image backdrop.
 - Can download videos
 - Stable [CSS hooks for browser userstyles](./docs/userstyles.md)
 - Stay on a page when switching accounts

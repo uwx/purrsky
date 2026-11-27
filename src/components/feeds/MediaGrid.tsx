@@ -1,40 +1,24 @@
-import {useRef} from 'react'
+import {useEffect, useState} from 'react'
 import {Pressable, View} from 'react-native'
-import Animated, {
-  type AnimatedRef,
-  useAnimatedRef,
-} from 'react-native-reanimated'
 import {Image} from 'expo-image'
 import {type ModerationDecision} from '@bsky/sdk/moderation'
 import {Trans, useLingui} from '@lingui/react/macro'
+import {useNavigation} from '@react-navigation/native'
 
 import {useHaptics} from '#/lib/haptics'
-import {getPostMediaDownloadName} from '#/lib/media/downloadFilename'
-import {resolveEmbedImageUris} from '#/lib/media/embed-image-formats'
-import {getRecordImageMimeType} from '#/lib/media/recordImageMimeType'
-import {getShapeRadius} from '#/lib/shapes'
-import {useEnableSquareButtons} from '#/state/preferences/enable-square-buttons'
-import {useFullsizeFormat} from '#/state/preferences/fullsize-format'
 import {
   applyImageTransforms,
   useImageCdnHost,
 } from '#/state/preferences/image-cdn-host'
 import {useLargeAltBadgeEnabled} from '#/state/preferences/large-alt-badge'
-import {useLoadAsPngs} from '#/state/preferences/load-small-pngs'
 import {useThumbnailFormat} from '#/state/preferences/thumbnail-format'
-import {
-  type FeedDescriptor,
-  type FeedPostSliceItem,
-} from '#/state/queries/post-feed'
-import {type VideoFeedSourceContext} from '#/screens/VideoFeed/types'
-import {atoms as a, tokens, useBreakpoints, useGutters, useTheme} from '#/alf'
+import {type FeedPostSliceItem} from '#/state/queries/post-feed'
+import {atoms as a, useBreakpoints, useGutters, useTheme} from '#/alf'
 import {
   type AspectRatioItem,
   packIntoStrips,
 } from '#/components/feeds/mediaGridLayout'
-import {useLightboxControls} from '#/components/Lightbox/state'
-import {type Dimensions} from '#/components/Lightbox/types'
-import {Link} from '#/components/Link'
+import {MediaViewer} from '#/components/MediaViewer'
 import {MediaInsetBorder} from '#/components/MediaInsetBorder'
 import * as Hider from '#/components/moderation/Hider'
 import {Text} from '#/components/Typography'
@@ -167,17 +151,17 @@ export function postHasGridMedia(post: app.bsky.feed.defs.PostView) {
  * row. Every strip fills the row, and blocks are spaced by the same gap as the
  * tiles inside them, so consecutive blocks read as one continuous wall.
  */
-export function MediaGridRow({
-  items,
-  feedDescriptor,
-  sourceContext,
-}: {
-  items: FeedPostSliceItem[]
-  feedDescriptor: FeedDescriptor
-  sourceContext: VideoFeedSourceContext
-}) {
+export function MediaGridRow({items}: {items: FeedPostSliceItem[]}) {
   const columns = useMediaGridColumns()
   const gutters = useGutters([0, 'base', 0, 'base'])
+  const haptics = useHaptics()
+  const navigation = useNavigation()
+  const [selectedTile, setSelectedTile] = useState<MediaGridItem | null>(null)
+
+  useEffect(
+    () => navigation.addListener('blur', () => setSelectedTile(null)),
+    [navigation],
+  )
   const tiles = items.flatMap(getMediaGridItems)
 
   if (tiles.length === 0) return null
@@ -193,14 +177,26 @@ export function MediaGridRow({
               <View key={tile.key} style={stripStyle(tile)}>
                 <MediaGridTile
                   tile={tile}
-                  feedDescriptor={feedDescriptor}
-                  sourceContext={sourceContext}
+                  onPress={() => {
+                    haptics.tap()
+                    setSelectedTile(tile)
+                  }}
                 />
               </View>
             ))}
           </View>
         ))}
       </View>
+      {selectedTile && (
+        <MediaViewer
+          key={selectedTile.key}
+          post={selectedTile.post}
+          moderation={selectedTile.moderation}
+          images={getPostImages(selectedTile.post)}
+          initialIndex={selectedTile.index}
+          onClose={() => setSelectedTile(null)}
+        />
+      )}
     </View>
   )
 }
@@ -248,12 +244,10 @@ function stripStyle({aspectRatio}: AspectRatioItem) {
 
 function MediaGridTile({
   tile,
-  feedDescriptor,
-  sourceContext,
+  onPress,
 }: {
   tile: MediaGridItem
-  feedDescriptor: FeedDescriptor
-  sourceContext: VideoFeedSourceContext
+  onPress: () => void
 }) {
   /*
    * Mirrors `VideoPostCard`: the row's own labels and the media's labels both
@@ -273,9 +267,9 @@ function MediaGridTile({
       </Hider.Mask>
       <Hider.Content>
         {tile.kind === 'video' ? (
-          <MediaGridVideoTile tile={tile} sourceContext={sourceContext} />
+          <MediaGridVideoTile tile={tile} onPress={onPress} />
         ) : (
-          <MediaGridImageTile tile={tile} feedDescriptor={feedDescriptor} />
+          <MediaGridImageTile tile={tile} onPress={onPress} />
         )}
       </Hider.Content>
     </Hider.Outer>
@@ -335,24 +329,21 @@ function MediaGridTileMask({tile}: {tile: MediaGridItem}) {
 
 function MediaGridVideoTile({
   tile,
-  sourceContext,
+  onPress,
 }: {
   tile: MediaGridItem
-  sourceContext: VideoFeedSourceContext
+  onPress: () => void
 }) {
   const t = useTheme()
   const {t: l} = useLingui()
-  const haptics = useHaptics()
   const {thumbnail} = tile
 
   return (
-    <Link
-      to={{
-        screen: 'VideoFeed',
-        params: {...sourceContext, initialPostUri: tile.post.uri},
-      }}
-      label={l`Video from @${tile.post.author.handle}`}
-      onPress={() => haptics.tap()}
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={l`Video from @${tile.post.author.handle}`}
+      accessibilityHint={l`Opens post`}
+      onPress={onPress}
       style={[
         a.justify_center,
         a.rounded_sm,
@@ -372,115 +363,51 @@ function MediaGridVideoTile({
       <View style={[a.absolute, a.inset_0, a.justify_center, a.align_center]}>
         <PlayButtonIcon size={24} />
       </View>
-    </Link>
+    </Pressable>
   )
 }
 
 function MediaGridImageTile({
   tile,
-  feedDescriptor,
+  onPress,
 }: {
   tile: MediaGridItem
-  feedDescriptor: FeedDescriptor
+  onPress: () => void
 }) {
   const t = useTheme()
   const {t: l} = useLingui()
-  const haptics = useHaptics()
-  const shapePreference = useEnableSquareButtons()
   const largeAltBadge = useLargeAltBadgeEnabled()
   const thumbnailFormat = useThumbnailFormat()
-  const fullsizeFormat = useFullsizeFormat()
-  const loadAsPngs = useLoadAsPngs()
   const imageCdnHost = useImageCdnHost()
-  const {openLightbox} = useLightboxControls()
-  const thumbRef = useAnimatedRef<Animated.View>()
-  const thumbDims = useRef<Dimensions | null>(null)
-
-  const {post, image} = tile
-  const images = getPostImages(post)
-  const borderRadius = getShapeRadius(
-    shapePreference,
-    tokens.borderRadius.sm,
-    tokens.borderRadius.sm,
-  )
-
-  const open = () => {
-    haptics.tap()
-    openLightbox({
-      images: images.map((img, index) => {
-        const uris = resolveEmbedImageUris(
-          {...img, mimeType: getRecordImageMimeType(img.fullsize, post.record)},
-          {
-            thumbnailFormat,
-            fullsizeFormat: fullsizeFormat ?? 'default',
-            loadAsPngs: loadAsPngs ?? true,
-          },
-        )
-        return {
-          uri: applyImageTransforms(uris.fullsize, {imageCdnHost}),
-          thumbUri: applyImageTransforms(uris.thumb, {imageCdnHost}),
-          downloadName: getPostMediaDownloadName(
-            post,
-            images.length > 1 ? index : undefined,
-          ),
-          dimensions: img.aspectRatio ?? null,
-          /*
-           * Only the tapped tile has a box to fly back to, the same tradeoff
-           * `ImageEmbed` makes for screen-reader galleries.
-           */
-          thumbRef: index === tile.index ? (thumbRef as AnimatedRef) : null,
-          thumbDimensions: index === tile.index ? thumbDims.current : null,
-          thumbRect: null,
-          thumbBorderRadius: borderRadius,
-          alt: img.alt,
-          type: 'image',
-        }
-      }),
-      index: tile.index,
-      metricsContext: {
-        layout: 'grid',
-        postUri: post.uri,
-        postAuthorDid: post.author.did,
-        feedDescriptor,
-      },
-    })
-  }
+  const {image} = tile
 
   return (
     <Pressable
-      onPress={open}
+      onPress={onPress}
       accessibilityRole="button"
       accessibilityLabel={image?.alt || l`Image`}
-      accessibilityHint=""
+      accessibilityHint={l`Opens post`}
       style={[
         a.rounded_sm,
         a.overflow_hidden,
         t.atoms.bg_contrast_25,
         {aspectRatio: tile.aspectRatio},
       ]}>
-      <Animated.View ref={thumbRef} collapsable={false} style={a.flex_1}>
-        {image ? (
-          <Image
-            source={{
-              uri: applyImageTransforms(image.thumb, {
-                imageCdnHost,
-                format: thumbnailFormat,
-              }),
-            }}
-            style={a.flex_1}
-            contentFit="cover"
-            accessibilityIgnoresInvertColors
-            onLoad={e => {
-              thumbDims.current = {
-                width: e.source.width,
-                height: e.source.height,
-              }
-            }}
-            loading="lazy"
-            useAppleWebpCodec
-          />
-        ) : null}
-      </Animated.View>
+      {image ? (
+        <Image
+          source={{
+            uri: applyImageTransforms(image.thumb, {
+              imageCdnHost,
+              format: thumbnailFormat,
+            }),
+          }}
+          style={a.flex_1}
+          contentFit="cover"
+          accessibilityIgnoresInvertColors
+          loading="lazy"
+          useAppleWebpCodec
+        />
+      ) : null}
       <MediaInsetBorder />
       {image?.alt ? (
         <View

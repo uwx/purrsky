@@ -101,6 +101,7 @@ export function ThreadItemAnchor({
   item,
   readerSeam,
   showViewCount = false,
+  hideAttachments = false,
   onPostSuccess,
   threadgateRecord,
 }: {
@@ -111,6 +112,8 @@ export function ThreadItemAnchor({
    */
   readerSeam?: ThreadItemAnchorReaderSeam
   showViewCount?: boolean
+  /** Hide media already displayed in the surrounding media viewer. */
+  hideAttachments?: boolean
   onPostSuccess?: (data: OnPostSuccessData) => void
   threadgateRecord?: app.bsky.feed.threadgate.Main
 }) {
@@ -127,6 +130,7 @@ export function ThreadItemAnchor({
       <ThreadItemAnchorInner
         item={item}
         showViewCount={showViewCount}
+        hideAttachments={hideAttachments}
         isRoot={isRoot}
         readerSeam={readerSeam}
         postShadow={postShadow}
@@ -222,6 +226,7 @@ function ThreadItemAnchorParentReplyLine({
 const ThreadItemAnchorInner = memo(function ThreadItemAnchorInner({
   item,
   showViewCount,
+  hideAttachments,
   isRoot,
   readerSeam,
   postShadow,
@@ -230,6 +235,7 @@ const ThreadItemAnchorInner = memo(function ThreadItemAnchorInner({
 }: {
   item: Extract<ThreadItem, {type: 'threadPost'}>
   showViewCount: boolean
+  hideAttachments: boolean
   isRoot: boolean
   readerSeam?: ThreadItemAnchorReaderSeam
   postShadow: Shadow<app.bsky.feed.defs.PostView>
@@ -552,12 +558,12 @@ const ThreadItemAnchorInner = memo(function ThreadItemAnchorInner({
                 ) : (
                   <ThreadItemPostNumber inline={false} value={postNumbering} />
                 )}
-                <PostPoll post={post} />
+                {!hideAttachments && <PostPoll post={post} />}
                 <TranslatedPost
                   post={post}
                   postTextStyle={[isCompactPosts ? a.text_md : a.text_lg]}
                 />
-                {post.embed && (
+                {!hideAttachments && post.embed && (
                   <View
                     style={[
                       inReader

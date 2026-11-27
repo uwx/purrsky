@@ -100,9 +100,15 @@ const CHILDREN_CHUNK_SIZE = 50
 export function PostThread({
   uri,
   initialView,
+  embedded = false,
+  hideAnchorAttachments = false,
 }: {
   uri: string
   initialView?: 'reader'
+  /** Contain scrolling and navigation chrome within an existing surface. */
+  embedded?: boolean
+  /** The anchor's media is already displayed beside this thread. */
+  hideAnchorAttachments?: boolean
 }) {
   const ax = useAnalytics()
   const showViewCount = ax.features.enabled(ax.features.PostViewCountsEnable)
@@ -140,7 +146,10 @@ export function PostThread({
   /*
    * One query to rule them all
    */
-  const thread = usePostThread({anchor: readerRoot ?? uri, initialView})
+  const thread = usePostThread({
+    anchor: readerRoot ?? uri,
+    initialView: embedded ? 'linear' : initialView,
+  })
   // eslint-disable-next-line react-hooks/preserve-manual-memoization -- restored memoization
   const {anchor, hasParents} = useMemo(() => {
     let hasParents = false
@@ -153,7 +162,7 @@ export function PostThread({
     return {hasParents}
   }, [thread.data.items])
 
-  useSetPostTitle(anchor?.value.post.author)
+  useSetPostTitle(embedded ? undefined : anchor?.value.post.author)
 
   // Track post:view event when anchor post is viewed
   const seenPostUriRef = useRef<string | null>(null)
@@ -333,13 +342,13 @@ export function PostThread({
 
       if (list && anchorElement && header && shouldHandleScroll.current) {
         const anchorOffsetTop = anchorElement.getBoundingClientRect().top
-        const headerHeight = header.getBoundingClientRect().height
+        const headerBottom = header.getBoundingClientRect().bottom
 
         // Like upstream, correct the anchor in the ResizeObserver callback,
         // before paint. Deferring this to requestAnimationFrame exposes a frame
         // of the newly prepended parents before the anchor is restored.
         // The measurement is viewport-relative, so add the current scroll offset.
-        const delta = anchorOffsetTop - headerHeight
+        const delta = anchorOffsetTop - headerBottom
         const offset = currentScrollOffsetRef.current + delta
         if (Math.abs(delta) > 1) list.scrollToOffset({offset, animated: false})
 
@@ -688,6 +697,7 @@ export function PostThread({
                 <ThreadItemAnchor
                   item={item}
                   showViewCount={showViewCount}
+                  hideAttachments={hideAnchorAttachments}
                   readerSeam={
                     reader?.anchorSeam
                       ? {
@@ -791,6 +801,7 @@ export function PostThread({
       gtMobile,
       anchorFeedItem,
       showViewCount,
+      hideAnchorAttachments,
     ],
   )
 
@@ -888,7 +899,7 @@ export function PostThread({
   return (
     <PostThreadContextProvider context={thread.context}>
       <Layout.Header.Outer headerRef={headerRef}>
-        <Layout.Header.BackButton />
+        {!embedded && <Layout.Header.BackButton />}
         <Layout.Header.Content>
           <Layout.Header.TitleText>
             {isAlsoLikedFocused ? (
@@ -898,7 +909,7 @@ export function PostThread({
             )}
           </Layout.Header.TitleText>
         </Layout.Header.Content>
-        {(hasOpThreadChain || thread.state.view === 'reader') && (
+        {!embedded && (hasOpThreadChain || thread.state.view === 'reader') && (
           <Layout.Header.Slot>
             <HeaderReaderToggle
               active={thread.state.view === 'reader'}
@@ -912,7 +923,9 @@ export function PostThread({
             setSort={setSortWrapped}
             view={thread.state.view}
             setView={setViewWrapped}
-            showReader={hasOpThreadChain || thread.state.view === 'reader'}
+            showReader={
+              !embedded && (hasOpThreadChain || thread.state.view === 'reader')
+            }
           />
         </Layout.Header.Slot>
       </Layout.Header.Outer>
@@ -930,6 +943,8 @@ export function PostThread({
               data={deferredSlices}
               renderItem={renderItem}
               keyExtractor={keyExtractor}
+              {...web({disableFullWindowScroll: embedded})}
+              style={embedded && [a.flex_1, {minHeight: 0}]}
               onContentSizeChange={platform({
                 web: onContentSizeChangeWebOnly,
                 default: onContentSizeChangeNativeOnly,
@@ -964,7 +979,7 @@ export function PostThread({
              * every row on web.
              */
             disableVirtualization={IS_WEB}
-            desktopFixedHeight
+            desktopFixedHeight={!embedded}
             sideBorders={false}
             ListFooterComponent={
               <ThreadAlsoLiked

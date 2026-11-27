@@ -1110,28 +1110,7 @@ let PostFeed = ({
           </View>
         )
       } else if (row.type === 'mediaGridRow') {
-        let sourceContext: VideoFeedSourceContext
-        if (feedType === 'author') {
-          sourceContext = {
-            type: 'author',
-            did: feedUriOrActorDid,
-            filter: feedTab as AuthorFilter,
-          }
-        } else {
-          sourceContext = {
-            type: 'feedgen',
-            uri: row.sourceFeedUri,
-            sourceInterstitial: feedCacheKey ?? 'none',
-          }
-        }
-
-        return (
-          <MediaGridRow
-            items={row.items}
-            feedDescriptor={feed}
-            sourceContext={sourceContext}
-          />
-        )
+        return <MediaGridRow items={row.items} />
       } else if (row.type === 'showLessFollowup') {
         return <ShowLessFollowup />
       } else {

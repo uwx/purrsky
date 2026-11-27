@@ -264,11 +264,17 @@ export function TextInput({
           let preventDefault = false
 
           if (clipboardData) {
+            const hasMedia = hasMediaTransfer(clipboardData)
+
             // Check if text is selected and pasted content is a URL
             const selection = view.state.selection
             const hasSelection = !selection.empty
 
-            if (hasSelection && clipboardData.types.includes('text/plain')) {
+            if (
+              !hasMedia &&
+              hasSelection &&
+              clipboardData.types.includes('text/plain')
+            ) {
               const pastedText = clipboardData.getData('text/plain').trim()
               const urlPattern =
                 /^(?:(?:(?:https?|ftp):)?\/\/)?(?:\S+(?::\S*)?@)?(?:(?!(?:10|127)(?:\.\d{1,3}){3})(?!(?:169\.254|192\.168)(?:\.\d{1,3}){2})(?!172\.(?:1[6-9]|2\d|3[0-1])(?:\.\d{1,3}){2})(?:[1-9]\d?|1\d\d|2[01]\d|22[0-3])(?:\.(?:1?\d{1,2}|2[0-4]\d|25[0-5])){2}(?:\.(?:[1-9]\d?|1\d\d|2[0-4]\d|25[0-4]))|(?:(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)(?:\.(?:[a-z\u00a1-\uffff0-9]-*)*[a-z\u00a1-\uffff0-9]+)*(?:\.(?:[a-z\u00a1-\uffff]{2,})))(?::\d{2,5})?(?:[/?#]\S*)?$/i
@@ -299,11 +305,19 @@ export function TextInput({
               }
             }
 
-            if (clipboardData.types.includes('text/html')) {
+            if (!hasMedia && clipboardData.types.includes('text/html')) {
               // Rich-text formatting is pasted, try retrieving plain text
               const text = clipboardData.getData('text/plain')
               // `pasteText` will invoke this handler again, but `clipboardData` will be null.
               view.pasteText(text)
+              preventDefault = true
+            }
+            if (hasMedia) {
+              /*
+               * `getImageOrVideoFromUri` adds the image/video to the post, so
+               * suppress the browser's text fallback, which would otherwise
+               * paste the file name or the image URL into the composer too.
+               */
               preventDefault = true
             }
             getImageOrVideoFromUri(clipboardData.items, (uri: string) => {
@@ -715,6 +729,21 @@ const styles = StyleSheet.create({
     borderWidth: 2,
   },
 })
+
+/**
+ * Whether a paste carries media we handle ourselves: image/video file items, or
+ * a plain-text URI pointing at an image.
+ */
+function hasMediaTransfer(transfer: DataTransfer) {
+  const {items} = transfer
+  for (let index = 0; index < items.length; index++) {
+    const type = items[index].type
+    if (type.startsWith('image/') || type.startsWith('video/')) {
+      return true
+    }
+  }
+  return isUriImage(transfer.getData('text/plain'))
+}
 
 function getImageOrVideoFromUri(
   items: DataTransferItemList,

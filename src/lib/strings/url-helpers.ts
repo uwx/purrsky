@@ -43,6 +43,31 @@ export function canParseUrl(url: string | URL, base?: string | URL): boolean {
   }
 }
 
+/**
+ * Parses a string into a URL, accepting only `http(s)` URLs whose authority
+ * carries a genuine dotted host (rejecting degenerate hosts such as a bare run
+ * of dots, or a host with a trailing dot).
+ *
+ * Facet link URIs come from other clients, so a scheme-only check lets such
+ * URIs through and renders a whole post as one clickable link to a destination
+ * the visible text says nothing about.
+ */
+export function parseLinkableUrl(text: string): URL | null {
+  let url: URL
+  try {
+    url = new URL(text)
+  } catch {
+    return null
+  }
+  if (url.protocol !== 'http:' && url.protocol !== 'https:') {
+    return null
+  }
+  if (!url.hostname.includes('.') || url.hostname.endsWith('.')) {
+    return null
+  }
+  return url
+}
+
 export function isValidDomain(str: string): boolean {
   const domain = str.toLowerCase().replace(/\.$/, '')
   const lastDot = domain.lastIndexOf('.')

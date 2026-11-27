@@ -4,7 +4,7 @@ import {RichText as RichTextAPI} from '@bsky/sdk/richtext'
 
 import {type HtmlSegment, segmentsToText} from '#/lib/strings/bridged-html'
 import {isRTLText} from '#/lib/strings/text-direction'
-import {toShortUrl} from '#/lib/strings/url-helpers'
+import {parseLinkableUrl, toShortUrl} from '#/lib/strings/url-helpers'
 import {
   android,
   atoms as a,
@@ -28,9 +28,6 @@ import {app} from '#/lexicons'
 import * as bsky from '#/types/bsky'
 
 const WORD_WRAP = {wordWrap: 1}
-// lifted from facet detection in `RichText` impl, _without_ `gm` flags
-const URL_REGEX =
-  /(^|\s|\()(?!javascript:)([a-z][a-z0-9+.-]*:\/\/[\S]+|(?:[a-z0-9]+\.)+[a-z0-9]+(:[0-9]+)?[\S]*|[a-z][a-z0-9+.-]*:[^\s()]+)/i
 
 export type RichTextProps = TextStyleProp &
   Pick<TextProps, 'selectable' | 'onLayout' | 'onTextLayout'> & {
@@ -297,7 +294,7 @@ export function RichText({
           </ProfileHoverCard>,
         )
       } else if (link && bsky.matches(app.bsky.richtext.facet.link, link)) {
-        const isValidLink = URL_REGEX.test(link.uri)
+        const isValidLink = parseLinkableUrl(link.uri) != null
         if (!isValidLink || disableLinks) {
           els.push(toShortUrl(segment.text))
         } else {

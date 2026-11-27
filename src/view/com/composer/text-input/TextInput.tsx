@@ -49,6 +49,7 @@ import {
 } from '#/features/bluemoji/util'
 import {app} from '#/lexicons'
 import * as bsky from '#/types/bsky'
+import {FormattingPreview} from './FormattingPreview'
 import {Autocomplete} from './mobile/Autocomplete'
 import {type TextInputProps} from './TextInput.types'
 
@@ -427,6 +428,7 @@ export function TextInput({
           />
         </View>
       </TextInputWrapper>
+      <FormattingPreview richtext={richtext} />
       <Autocomplete
         prefix={autocompletePrefix}
         onSelect={onSelectAutocompleteItem}

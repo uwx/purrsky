@@ -24,6 +24,7 @@ alt="Get it on Obtainium" height="54" /></a> -->
 - Embed player works with [stream.place](https://stream.place/) links!
 - Open posts in a configurable ATProto explorer, Skythread, and original bridged fedi instances
 - You can delete and redraft (basically edit!) posts
+- [Parfait-compatible formatting facets](https://tangled.org/juliet.paris/parfait/blob/c435dfe0f995feb6925aaaf8b6e1bad5494608cc/src/lib/formatting.ts): write `**bold**`, `*italic*` / `_italic_`, `~~strikethrough~~`, inline `` `code` ``, and `||spoiler||` in the composer. Web styles the editable source; native shows a formatted preview. Escape a marker with `\` to keep it literal. Markers remain in posted text for other clients; spoilers use reversible ROT18 obscuring, not encryption, and reveal on tap in supporting clients.
 - Better defaults (alt text required 😉 autoplay off 🫨)
 - Read your chat threads with deleted/deactivated accounts
 - Unique repost icons in notifications

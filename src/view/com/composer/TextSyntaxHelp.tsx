@@ -12,6 +12,9 @@ export function TextSyntaxHelp() {
   const slash = String.fromCharCode(92)
   const help = [
     l`[label](url) makes a masked link`,
+    l`**bold**, *italic* or _italic_, ~~strikethrough~~, and \`code\` format text`,
+    l`||spoiler|| hides text until tapped (obscured with ROT18, not encrypted)`,
+    l`${slash} before a formatting marker keeps it literal`,
     l`${slash}... keeps facets like links, hashtags, and mentions plain`,
     l`<...> contains a facet`,
   ].join('\n')

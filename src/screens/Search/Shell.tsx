@@ -478,6 +478,11 @@ export function SearchScreenShell({
   )
 
   const onSoftReset = useCallback(() => {
+    if (IS_WEB && showAutocomplete) {
+      // The recent searches / autocomplete panel is open, close it first.
+      onPressCancelSearch()
+      return
+    }
     if (IS_WEB) {
       /*
        * Empty params resets the URL to be /search rather than /search?q=
@@ -486,6 +491,11 @@ export function SearchScreenShell({
       const parameters = withoutSearchParams(
         route.params as Record<string, unknown>,
       )
+      if (Object.keys(parameters).length === 0) {
+        // Already on the explore page: focus the search box, as native does.
+        textInput.current?.focus()
+        return
+      }
       // @ts-expect-error route is not typesafe
       navigation.replace(route.name, parameters)
     } else {
@@ -497,7 +507,14 @@ export function SearchScreenShell({
       })
       textInput.current?.focus()
     }
-  }, [navigation, route.name, route.params, updateSearchText])
+  }, [
+    navigation,
+    onPressCancelSearch,
+    route.name,
+    route.params,
+    showAutocomplete,
+    updateSearchText,
+  ])
 
   useFocusEffect(
     useCallback(() => {

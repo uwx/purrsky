@@ -76,6 +76,12 @@ export function useVideoElement(ref: RefObject<HTMLVideoElement | null>) {
 
       if (!ref.current) return
       if (playWhenReadyRef.current) {
+        /*
+         * Clear the flag before playing: a failed `play()` (autoplay policy,
+         * interrupted by pause) must not leave the video queued to play on the
+         * next `canplay`, and a successful one must not either.
+         */
+        playWhenReadyRef.current = false
         try {
           await ref.current.play()
         } catch (e: any) {
@@ -90,7 +96,6 @@ export function useVideoElement(ref: RefObject<HTMLVideoElement | null>) {
             throw e
           }
         }
-        playWhenReadyRef.current = false
       }
     }
 

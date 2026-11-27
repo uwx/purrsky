@@ -137,10 +137,12 @@ function redraftFormatting(rt: RichText): string {
     for (const feature of facet.features) {
       const kind = kindOf(feature)
       if (kind) {
-        const marker = MARKERS[kind].find(m =>
-          rt.text.slice(sourceStart - m.length, sourceStart) === m &&
-          rt.text.slice(sourceEnd, sourceEnd + m.length) === m,
-        ) ?? MARKERS[kind][0]
+        const marker = feature.$type.startsWith('social.parfait.richtext.facet#')
+          ? MARKERS[kind].find(m =>
+              rt.text.slice(sourceStart - m.length, sourceStart) === m &&
+              rt.text.slice(sourceEnd, sourceEnd + m.length) === m,
+            ) ?? MARKERS[kind][0]
+          : MARKERS[kind][0]
         wrappers.push({start, end, open: marker, close: marker, kind})
       } else if (AppBskyRichtextFacet.isLink(feature)) {
         wrappers.push({
@@ -181,7 +183,11 @@ function redraftFormatting(rt: RichText): string {
     // Split links at style boundaries rather than putting markers in a link label.
     const next = merged
       .filter(w => w.start <= at && w.end > at)
-      .sort((a, b) => Number(!a.kind) - Number(!b.kind) || a.start - b.start || b.end - a.end)
+      .sort((a, b) =>
+        Number(!a.kind) - Number(!b.kind) ||
+        Number(a.kind === 'code') - Number(b.kind === 'code') ||
+        a.start - b.start || b.end - a.end,
+      )
     let common = 0
     while (common < active.length && common < next.length && active[common] === next[common]) common++
     for (let j = active.length - 1; j >= common; j--) result += active[j].close
@@ -191,7 +197,7 @@ function redraftFormatting(rt: RichText): string {
     result += active.some(w => w.kind === 'code')
       ? value
       : active.some(w => !w.kind)
-        ? value.replace(/[\\*_~`|]/g, '\\$&')
+        ? value.replace(/[\\*_~`|=]/g, '\\$&')
         : escapeUnfacetedText(value)
   }
   return result
@@ -255,7 +261,7 @@ function escapeUnfacetedText(text: string): string {
       result += text[i]
       continue
     }
-    if (escapedStarts.has(i) || /[\\*_~`|]/.test(text[i])) result += '\\'
+    if (escapedStarts.has(i) || /[\\*_~`|=]/.test(text[i])) result += '\\'
     result += text[i]
   }
   return result

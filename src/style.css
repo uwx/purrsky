@@ -137,6 +137,12 @@ img {
 .ProseMirror .composer-format-strikethrough {
   text-decoration: line-through;
 }
+.ProseMirror .composer-format-underline {
+  text-decoration-line: underline;
+}
+.ProseMirror .composer-format-underline.composer-format-strikethrough {
+  text-decoration-line: underline line-through;
+}
 .ProseMirror .composer-format-code {
   font-family: monospace;
   background-color: color-mix(in srgb, currentColor 8%, transparent);
@@ -145,6 +151,10 @@ img {
 .ProseMirror .composer-format-spoiler {
   background-color: color-mix(in srgb, currentColor 18%, transparent);
   border-radius: 3px;
+}
+.ProseMirror .composer-format-highlight {
+  background-color: var(--format-highlight-background);
+  color: var(--format-highlight-color);
 }
 .ProseMirror .composer-code-comment {
   color: var(--code-comment);

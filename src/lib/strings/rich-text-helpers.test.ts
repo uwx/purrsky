@@ -1,3 +1,4 @@
+import {type Unknown$TypedObject} from '@atproto/lex'
 import {RichText} from '@bsky/sdk/richtext'
 
 import {featureOf, kindOf, piecesOf, shift} from './formatting'
@@ -268,7 +269,7 @@ describe('formatting redrafts', () => {
   })
 
   it('does not promote plain Markdown into formatting while redrafting', () => {
-    const text = '**literal** *literal* ~~literal~~ ||literal|| `literal`'
+    const text = '**literal** *literal* ~~literal~~ ||literal|| `literal` __literal__ ==literal=='
     const redraft = richTextToRedraftString(new RichText({text}))
     const again = repost(redraft)
     expect(again.text).toBe(text)
@@ -293,6 +294,85 @@ describe('formatting redrafts', () => {
       }],
     })
     expect(richTextToRedraftString(original)).toBe('||héllo 123 🌟||')
+  })
+
+  const visible = (rt: RichText) => piecesOf(rt.text, rt.facets).flatMap(piece =>
+    Array.from(piece.text, text => ({
+      text,
+      kinds: [...piece.kinds].sort(),
+      links: piece.features.filter(feature => feature.$type === 'app.bsky.richtext.facet#link').map(feature => 'uri' in feature ? feature.uri : undefined),
+    })),
+  )
+  const blog = (kind: string): Unknown$TypedObject =>
+    ({$type: `blog.pckt.richtext.facet#${kind}`} as unknown as Unknown$TypedObject)
+
+  it('round trips the exact blog fixture with one complete underline run and nested code', () => {
+    const original = new RichText({
+      text: 'hello world ',
+      facets: [
+        {index: {byteStart: 0, byteEnd: 5}, features: [blog('bold'), blog('underline')]},
+        {index: {byteStart: 5, byteEnd: 6}, features: [blog('underline')]},
+        {index: {byteStart: 6, byteEnd: 11}, features: [blog('underline'), blog('italic'), blog('strikethrough'), blog('code')]},
+        {index: {byteStart: 11, byteEnd: 12}, features: [blog('underline')]},
+      ],
+    })
+    const redraft = richTextToRedraftString(original)
+    expect(redraft).toBe('__**hello** *~~`world`~~* __')
+    const again = repost(redraft)
+    expect(visible(again)).toEqual(visible(original))
+    expect(visible(repost(richTextToRedraftString(again)))).toEqual(visible(original))
+  })
+
+  it('keeps code innermost when another style starts and ends within it', () => {
+    const original = new RichText({
+      text: 'one two three',
+      facets: [
+        {index: {byteStart: 0, byteEnd: 13}, features: [blog('code')]},
+        {index: {byteStart: 4, byteEnd: 7}, features: [blog('bold')]},
+      ],
+    })
+    expect(visible(repost(richTextToRedraftString(original)))).toEqual(visible(original))
+  })
+
+  it('keeps literal blog Markdown and equals visible across redrafting', () => {
+    const original = new RichText({
+      text: '**word** ==plain==',
+      facets: [{
+        index: {byteStart: 2, byteEnd: 6},
+        features: [blog('bold')],
+      }],
+    })
+    const redraft = richTextToRedraftString(original)
+    expect(redraft).toContain('\\=\\=plain\\=\\=')
+    expect(visible(repost(redraft))).toEqual(visible(original))
+  })
+
+  it('round trips Unicode links and underlined trailing whitespace with new styles', () => {
+    const original = repost('🌟 __==[世](https://example.com/a?x=1)== __')
+    const redraft = richTextToRedraftString(original)
+    const again = repost(redraft)
+    expect(again.text).toBe('🌟 世 ')
+    expect(visible(again)).toEqual(visible(original))
+    expect(again.facets?.find(facet => facet.features.some(feature => feature.$type === 'app.bsky.richtext.facet#link'))).toEqual({
+      index: {byteStart: 5, byteEnd: 8},
+      features: [{$type: 'app.bsky.richtext.facet#link', uri: 'https://example.com/a?x=1'}],
+    })
+  })
+
+  it('round trips standalone whitespace-only underline and highlight facets', () => {
+    const original = new RichText({
+      text: '   ',
+      facets: [
+        {index: {byteStart: 0, byteEnd: 1}, features: [featureOf('underline')]},
+        {index: {byteStart: 2, byteEnd: 3}, features: [featureOf('highlight')]},
+      ],
+    })
+    const redraft = richTextToRedraftString(original)
+    expect(redraft).toBe('__ __ == ==')
+    const again = repost(redraft)
+    expect(again.text).toBe(original.text)
+    expect(again.facets).toEqual(original.facets)
+    expect(visible(again)).toEqual(visible(original))
   })
 })
 

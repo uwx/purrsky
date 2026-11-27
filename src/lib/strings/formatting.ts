@@ -3,23 +3,32 @@ import {type AppBskyRichtextFacet} from '@atproto/api'
 import {type Unknown$TypedObject} from '@atproto/lex'
 import {RichText, UnicodeString} from '@bsky/sdk/richtext'
 
-export type Kind = 'bold' | 'italic' | 'strikethrough' | 'code' | 'spoiler'
+export type Kind = 'bold' | 'italic' | 'strikethrough' | 'code' | 'spoiler' | 'underline' | 'highlight'
 export const MARKERS: Record<Kind, string[]> = {
   bold: ['**'],
   italic: ['*', '_'],
   strikethrough: ['~~'],
   code: ['`'],
   spoiler: ['||'],
+  underline: ['__'],
+  highlight: ['=='],
 }
 const KINDS = Object.keys(MARKERS) as Kind[]
 const NSID = 'social.parfait.richtext.facet'
+const BLOG_NSID = 'blog.pckt.richtext.facet'
 export const featureOf = (kind: Kind): Unknown$TypedObject =>
-  ({$type: `${NSID}#${kind}`} as unknown as Unknown$TypedObject)
+  ({$type: `${kind === 'underline' || kind === 'highlight' ? BLOG_NSID : NSID}#${kind}`} as unknown as Unknown$TypedObject)
 export function kindOf(feature: {$type?: string} | undefined): Kind | undefined {
   const type = feature?.$type
-  if (typeof type !== 'string' || !type.startsWith(`${NSID}#`)) return
-  const kind = type.slice(NSID.length + 1) as Kind
-  return KINDS.includes(kind) ? kind : undefined
+  if (typeof type !== 'string') return
+  if (type.startsWith(`${NSID}#`)) {
+    const kind = type.slice(NSID.length + 1) as Kind
+    return KINDS.includes(kind) && kind !== 'underline' && kind !== 'highlight' ? kind : undefined
+  }
+  if (type.startsWith(`${BLOG_NSID}#`)) {
+    const kind = type.slice(BLOG_NSID.length + 1) as Kind
+    return KINDS.includes(kind) && kind !== 'spoiler' ? kind : undefined
+  }
 }
 
 type Span = {start: number; end: number}
@@ -43,16 +52,20 @@ const patterns = [
   ['spoiler', '||'],
   ['bold', '**'],
   ['strikethrough', '~~'],
+  ['underline', '__'],
+  ['highlight', '=='],
   ['italic', '*'],
   ['italic', '_'],
 ].map(([kind, marker]) => {
   const one = marker[0].replace(/[*|]/g, '\\$&')
   const m = marker.replace(/[*|]/g, '\\$&')
-  const words = marker === '||'
-    ? '[^\\n]*?\\S[^\\n]*?'
-    : marker.length === 1
-      ? `[^\\s${one}](?:[^\\n]*?[^\\s${one}])?`
-      : '\\S(?:[^\\n]*?\\S)?'
+  const words = kind === 'underline' || kind === 'highlight'
+    ? '[^\\n]+?'
+    : marker === '||'
+      ? '[^\\n]*?\\S[^\\n]*?'
+      : marker.length === 1
+        ? `[^\\s${one}](?:[^\\n]*?[^\\s${one}])?`
+        : '\\S(?:[^\\n]*?\\S)?'
   return {
     kind: kind as Kind,
     marker,
@@ -64,6 +77,7 @@ const patterns = [
 export function formattingIn(text: string, linked: Span[] = []): {
   formats: Formatted[]
   escapes: number[]
+  removals: number[]
   linked: Span[]
   blocks: CodeBlock[]
 } {
@@ -89,7 +103,7 @@ export function formattingIn(text: string, linked: Span[] = []): {
   }
   for (let i = 0; i < text.length; i++) {
     if (inside(i, linked) || inside(i, blocks)) continue
-    if (text[i] === '\\' && '*_~`|\\'.includes(text[i + 1] ?? '') && i + 1 < text.length) {
+    if (text[i] === '\\' && '*_~`|=\\'.includes(text[i + 1] ?? '') && i + 1 < text.length) {
       escapes.push(i)
       masked[i] = masked[i + 1] = HIDDEN
       i++
@@ -110,7 +124,7 @@ export function formattingIn(text: string, linked: Span[] = []): {
   )
   for (const span of outsideCode) {
     for (let i = span.start; i < span.end; i++) {
-      if ('*_~|'.includes(masked[i])) masked[i] = HIDDEN
+      if ('*_~|='.includes(masked[i])) masked[i] = HIDDEN
     }
   }
   for (const {kind, marker, pattern} of patterns) {
@@ -132,9 +146,17 @@ export function formattingIn(text: string, linked: Span[] = []): {
   }
   formats.sort((a, b) => a.start - b.start || b.end - a.end)
   const spoilers = formats.filter(f => f.kind === 'spoiler')
+  const removals = [...escapes]
+  for (const format of formats) {
+    if (format.kind !== 'underline' && format.kind !== 'highlight') continue
+    for (let i = 0; i < format.marker; i++) {
+      removals.push(format.start - format.marker + i, format.end + i)
+    }
+  }
   return {
     formats,
     escapes,
+    removals,
     linked: outsideCode.filter(span => !spoilers.some(f => overlaps(span, f))),
     blocks,
   }
@@ -181,8 +203,9 @@ export function piecesOf(text: string, facets: Facet[] | undefined): Piece[] {
   const hidden: Span[] = []
   const spoilers: Span[] = []
   for (const kind of KINDS) {
+    if (kind === 'underline' || kind === 'highlight') continue
     const runs: Span[] = []
-    for (const span of spans.filter(s => s.facet.features.some(f => kindOf(f) === kind)).sort((a, b) => a.start - b.start)) {
+    for (const span of spans.filter(s => s.facet.features.some(f => f.$type === `${NSID}#${kind}`)).sort((a, b) => a.start - b.start)) {
       const last = runs.at(-1)
       if (last && last.end >= span.start) last.end = Math.max(last.end, span.end)
       else runs.push({start: span.start, end: span.end})
@@ -216,7 +239,7 @@ export function piecesOf(text: string, facets: Facet[] | undefined): Piece[] {
 
 const posted = new WeakMap<RichText, string>()
 
-/** Preview keeps source text intact; posting retains markers and encodes spoilers once. */
+/** Preview keeps source intact; posting strips blog delimiters and encodes Parfait spoilers once. */
 export function applyFormattingFacets(rt: RichText, {forPosting = false}: {forPosting?: boolean} = {}): RichText {
   if (posted.get(rt) === rt.text) return rt
   const spans = spansOf(rt.text, rt.facets as Facet[] | undefined)
@@ -277,7 +300,7 @@ export function applyFormattingFacets(rt: RichText, {forPosting = false}: {forPo
       }
       rt.unicodeText = new UnicodeString(value + rt.text.slice(start))
     }
-    for (const index of parsed.escapes.sort((a, b) => b - a)) {
+    for (const index of parsed.removals.sort((a, b) => b - a)) {
       const byte = rt.unicodeText.utf16IndexToUtf8Index(index)
       rt.delete(byte, byte + 1)
     }

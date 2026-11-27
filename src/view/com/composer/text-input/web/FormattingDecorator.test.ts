@@ -101,3 +101,15 @@ it('keeps a multiline string token aligned across hard breaks', () => {
   const ranges = getFormattingDecorations(doc).find()
   expect(ranges.some(range => range.from === 19 && range.to === 28)).toBe(true)
 })
+
+it('maps underline and highlight source spans with nested styles and trailing whitespace', () => {
+  const doc = schema.node(
+    'doc',
+    null,
+    paragraph('🌟 __hello ~~world~~ __ ==hé== after'),
+  )
+  const ranges = getFormattingDecorations(doc).find()
+  expect(ranges.some(range => range.from === 6 && range.to === 22)).toBe(true)
+  expect(ranges.some(range => range.from === 14 && range.to === 19)).toBe(true)
+  expect(ranges.some(range => range.from === 27 && range.to === 29)).toBe(true)
+})

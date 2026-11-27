@@ -502,4 +502,49 @@ describe('formatting and facet syntax integration', () => {
     expect(shortened.text).toBe(`**${uri}**`)
     expect(shortened.facets?.some(f => f.features.some(feature => feature.$type === featureOf('bold').$type))).toBe(true)
   })
+
+  it('removes new delimiters, escapes and legacy angles once with correct Unicode link offsets', () => {
+    const text = String.raw`🌟 __hé ==世== __ \= <example.com> \#plain **old**`
+    const rt = prepare(text, false)
+    expect(rt.text).toBe(text)
+    const indices = getFacetSyntaxRemovalIndices(rt)
+    const expected = text.split('').filter((_, index) => !indices.has(index)).join('')
+    applyFacetSyntax(rt, {removeSyntax: true})
+    expect(rt.text).toBe('🌟 hé 世  = example.com #plain **old**')
+    expect(rt.text).toBe(expected)
+    expect(rt.facets?.map(facet => [facet.index, facet.features.map(feature => kindOf(feature) ?? feature.$type)])).toEqual([
+      [{byteStart: 5, byteEnd: 13}, ['underline']],
+      [{byteStart: 9, byteEnd: 12}, ['highlight']],
+      [{byteStart: 16, byteEnd: 27}, ['app.bsky.richtext.facet#link']],
+      [{byteStart: 37, byteEnd: 40}, ['bold']],
+    ])
+    const facets = rt.facets
+    applyFacetSyntax(rt, {removeSyntax: true})
+    expect(rt.text).toBe(expected)
+    expect(rt.facets).toBe(facets)
+  })
+
+  it('keeps literal new symbols in inline code, fences, URL paths and masked labels', () => {
+    const uri = 'https://example.com/__path__?a==b=='
+    const inline = String.raw`__code__ ==code== \= <#tag>`
+    const fence = '```js\n__code__ ==code== \\= <#tag>\n```'
+    const source = `\`${inline}\`\n${fence}\n${uri}\n[__label__ ==label==](${uri})`
+    const rt = prepare(source)
+    expect(rt.text).toBe(`\`${inline}\`\n${fence}\n${uri}\n__label__ ==label==`)
+    expect(rt.facets?.flatMap(facet => facet.features).map(kindOf).filter(Boolean)).toEqual(['code'])
+    expect(facetTexts(rt, true)).toEqual([uri, '__label__ ==label=='])
+  })
+
+  it('posts escaped new markup literally while preserving trailing whitespace facets', () => {
+    const source = String.raw`\__literal__ \==literal== __ __ ==tail ==`
+    const rt = prepare(source)
+    expect(rt.text).toBe('__literal__ ==literal==   tail ')
+    expect(rt.facets?.map(facet => [
+      rt.unicodeText.slice(facet.index.byteStart, facet.index.byteEnd),
+      facet.features.map(kindOf),
+    ])).toEqual([
+      [' ', ['underline']],
+      ['tail ', ['highlight']],
+    ])
+  })
 })

@@ -326,10 +326,10 @@ export function applyFacetSyntax(
   )
   applyFormattingFacets(rt, {forPosting: removeSyntax})
   if (removeSyntax) {
-    const escaped = new Set(formatting.escapes)
+    const removed = new Set(formatting.removals)
     for (const index of [...new Set(deletionPoints)].sort((a, b) => b - a)) {
-      if (escaped.has(index)) continue
-      const shifted = index - formatting.escapes.filter(escape => escape < index).length
+      if (removed.has(index)) continue
+      const shifted = index - formatting.removals.filter(point => point < index).length
       const byte = rt.unicodeText.utf16IndexToUtf8Index(shifted)
       rt.delete(byte, byte + 1)
     }
@@ -338,7 +338,7 @@ export function applyFacetSyntax(
   return rt
 }
 
-/** UTF-16 positions of escape backslashes and angle delimiters removed on posting. */
+/** UTF-16 positions of escapes, blog formatting delimiters and angle syntax removed on posting. */
 export function getFacetSyntaxRemovalIndices(rt: RichText): Set<number> {
   const preview = rt.clone()
   applyMarkdownLinkFacets(preview)
@@ -352,7 +352,7 @@ export function getFacetSyntaxRemovalIndices(rt: RichText): Set<number> {
         end: preview.unicodeText.slice(0, facet.index.byteEnd).length,
       })),
   )
-  for (const index of formatting.escapes) indices.add(index)
+  for (const index of formatting.removals) indices.add(index)
   const literal = [
     ...formatting.blocks,
     ...formatting.formats.filter(format => format.kind === 'code' || format.kind === 'spoiler'),

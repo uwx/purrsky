@@ -13,6 +13,7 @@ export function TextSyntaxHelp() {
   const help = [
     l`[label](url) makes a masked link`,
     l`**bold**, *italic* or _italic_, ~~strikethrough~~, and \`code\` format text`,
+    l`__underline__ and ==highlight== add blog.pckt formatting`,
     l`Use a line of three backticks with a language (like \`\`\`ts), then code, then three backticks on their own line for highlighted code`,
     l`||spoiler|| hides text until tapped (obscured with ROT18, not encrypted)`,
     l`${slash} before a formatting marker keeps it literal`,

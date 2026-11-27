@@ -68,7 +68,21 @@ describe('Parfait formatting syntax', () => {
 describe('formatting facets', () => {
   it('recognizes only exact supported namespace features', () => {
     expect(kindOf(featureOf('bold'))).toBe('bold')
-    for (const $type of ['social.parfait.richtext.facet#unknown', 'evil.social.parfait.richtext.facet#bold', 'social.parfait.richtext.facet#bold.extra']) {
+    for (const $type of [
+      'social.parfait.richtext.facet#unknown',
+      'evil.social.parfait.richtext.facet#bold',
+      'social.parfait.richtext.facet#bold.extra',
+      'social.parfait.richtext.facet#underline',
+      'social.parfait.richtext.facet#highlight',
+      'blog.pckt.richtext.facet#spoiler',
+      'blog.pckt.richtext.facet#bold.extra',
+      'evil.blog.pckt.richtext.facet#bold',
+      'blog.pckt.richtext.facet#id',
+      'blog.pckt.richtext.facet#link',
+      'blog.pckt.richtext.facet#didMention',
+      'blog.pckt.richtext.facet#atMention',
+      'blog.pckt.richtext.facet#footnote',
+    ]) {
       expect(kindOf({$type})).toBeUndefined()
     }
     expect(kindOf(undefined)).toBeUndefined()
@@ -147,4 +161,94 @@ it('trims swallowed closing markers only when the opening marker precedes a link
   const linked = [{start: 0, end: url.length}]
   expect(formattingIn(url, linked).linked).toEqual(linked)
   expect(formattingIn(url, linked).formats).toEqual([])
+})
+
+describe('blog.pckt formatting', () => {
+  const blog = (kind: string) => ({$type: `blog.pckt.richtext.facet#${kind}`})
+
+  it('recognizes all six markerless variants and emits only the two new blog types', () => {
+    for (const kind of ['bold', 'italic', 'strikethrough', 'code', 'underline', 'highlight'] as const) {
+      expect(kindOf(blog(kind))).toBe(kind)
+      expect(featureOf(kind).$type).toBe(
+        `${kind === 'underline' || kind === 'highlight' ? 'blog.pckt' : 'social.parfait'}.richtext.facet#${kind}`,
+      )
+    }
+    expect(featureOf('spoiler').$type).toBe('social.parfait.richtext.facet#spoiler')
+  })
+
+  it('segments the exact live fixture without dropping its trailing underlined space', () => {
+    const text = 'hello world '
+    const facets = [
+      {index: {byteStart: 0, byteEnd: 5}, features: [blog('bold'), blog('underline')]},
+      {index: {byteStart: 5, byteEnd: 6}, features: [blog('underline')]},
+      {index: {byteStart: 6, byteEnd: 11}, features: [blog('underline'), blog('italic'), blog('strikethrough'), blog('code')]},
+      {index: {byteStart: 11, byteEnd: 12}, features: [blog('underline')]},
+    ]
+    expect(piecesOf(text, facets).map(({text: value, kinds}) => [value, kinds])).toEqual([
+      ['hello', ['bold', 'underline']],
+      [' ', ['underline']],
+      ['world', ['underline', 'italic', 'strikethrough', 'code']],
+      [' ', ['underline']],
+    ])
+  })
+
+  it.each([
+    ['**word**', 'bold'],
+    ['*word*', 'italic'],
+    ['_word_', 'italic'],
+    ['~~word~~', 'strikethrough'],
+    ['`word`', 'code'],
+    ['__word__', 'underline'],
+    ['==word==', 'highlight'],
+  ])('never hides literal blog markers in %s', (text, kind) => {
+    const span = facet(text, 'word', kind as Kind)
+    span.features = [blog(kind)]
+    const pieces = piecesOf(text, [span])
+    expect(pieces.map(piece => piece.text).join('')).toBe(text)
+    expect(pieces.find(piece => piece.text === 'word')?.kinds).toEqual([kind])
+  })
+
+  it('combines overlapping namespaces without merging their marker ownership', () => {
+    const text = '**one** **two**'
+    const first = facet(text, 'one', 'bold')
+    const second = facet(text, 'two', 'bold')
+    second.features = [blog('bold')]
+    const overlap = {
+      index: {byteStart: 2, byteEnd: text.length},
+      features: [blog('italic'), blog('highlight')],
+    }
+    const pieces = piecesOf(text, [first, second, overlap])
+    expect(pieces.map(piece => piece.text).join('')).toBe('one **two**')
+    expect(pieces.find(piece => piece.text === 'one')?.kinds).toEqual(['bold', 'italic', 'highlight'])
+    expect(pieces.find(piece => piece.text === 'two')?.kinds).toEqual(['bold', 'italic', 'highlight'])
+  })
+
+  it('parses nested new styles, whitespace-only runs and escaped equals', () => {
+    const text = String.raw`__ hello ==世== __ == == \==literal==`
+    const parsed = formattingIn(text)
+    expect(parsed.formats.map(format => [format.kind, text.slice(format.start, format.end)])).toEqual([
+      ['underline', ' hello ==世== '],
+      ['highlight', '世'],
+      ['highlight', ' '],
+    ])
+    expect(parsed.escapes).toEqual([text.indexOf('\\')])
+  })
+
+  it('removes only new delimiters and remaps Unicode facets exactly once', () => {
+    const source = '🌟 __hé ==世== __ **old** \\=literal'
+    const rt = new RichText({text: source})
+    applyFormattingFacets(rt)
+    expect(rt.text).toBe(source)
+    applyFormattingFacets(rt, {forPosting: true})
+    expect(rt.text).toBe('🌟 hé 世  **old** =literal')
+    expect(rt.facets?.map(span => [span.index, span.features.map(kindOf)])).toEqual([
+      [{byteStart: 5, byteEnd: 13}, ['underline']],
+      [{byteStart: 9, byteEnd: 12}, ['highlight']],
+      [{byteStart: 16, byteEnd: 19}, ['bold']],
+    ])
+    const facets = rt.facets
+    applyFormattingFacets(rt, {forPosting: true})
+    expect(rt.facets).toBe(facets)
+    expect(rt.text).toBe('🌟 hé 世  **old** =literal')
+  })
 })

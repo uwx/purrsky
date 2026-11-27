@@ -40,6 +40,8 @@ jest.mock('#/alf', () => ({
       contrast_500: '#777',
       contrast_600: '#666',
       contrast_900: '#111',
+      primary_100: '#fea',
+      primary_900: '#321',
       primary_600: '#36c',
       primary_700: '#25b',
       primary_800: '#149',
@@ -216,6 +218,159 @@ it('renders formatting without markers and preserves unfaceted markdown', () => 
     StyleSheet.flatten(screen.getByText('hello').props.style),
   ).toMatchObject({fontWeight: '700'})
   expect(screen.getByText('hello **literal**')).toBeTruthy()
+})
+
+it('renders the canonical blog.pckt sample with combined decorations and whitespace', () => {
+  const record = {
+    $type: 'app.bsky.feed.post',
+    text: 'hello world ',
+    facets: [
+      {
+        index: {byteStart: 0, byteEnd: 5},
+        features: [
+          {$type: 'blog.pckt.richtext.facet#bold'},
+          {$type: 'blog.pckt.richtext.facet#underline'},
+        ],
+      },
+      {
+        index: {byteStart: 5, byteEnd: 6},
+        features: [{$type: 'blog.pckt.richtext.facet#underline'}],
+      },
+      {
+        index: {byteStart: 6, byteEnd: 11},
+        features: [
+          {$type: 'blog.pckt.richtext.facet#underline'},
+          {$type: 'blog.pckt.richtext.facet#italic'},
+          {$type: 'blog.pckt.richtext.facet#strikethrough'},
+          {$type: 'blog.pckt.richtext.facet#code'},
+        ],
+      },
+      {
+        index: {byteStart: 11, byteEnd: 12},
+        features: [{$type: 'blog.pckt.richtext.facet#underline'}],
+      },
+    ],
+  }
+  const screen = render(
+    <RichText
+      value={new RichTextAPI({
+        ...record,
+        facets: record.facets.map(facet => ({
+          ...facet,
+          features: facet.features as Unknown$TypedObject[],
+        })),
+      })}
+    />,
+  )
+  expect(StyleSheet.flatten(screen.getByText('hello').props.style)).toMatchObject({
+    fontWeight: '700',
+    textDecorationLine: 'underline',
+  })
+  expect(StyleSheet.flatten(screen.getByText('world').props.style)).toMatchObject({
+    textDecorationLine: 'underline line-through',
+    fontStyle: 'italic',
+    fontFamily: 'Courier New',
+    backgroundColor: '#eee',
+  })
+  expect(
+    screen.getByText('hello world ', {exact: true, normalizer: text => text}),
+  ).toBeTruthy()
+  const spaces = screen.getAllByText(' ', {
+    exact: true,
+    normalizer: text => text,
+  })
+  expect(spaces).toHaveLength(2)
+  for (const space of spaces) {
+    expect(StyleSheet.flatten(space.props.style)).toMatchObject({
+      textDecorationLine: 'underline',
+    })
+  }
+})
+
+it('highlights Unicode links with mixed styles without consuming literal markers', () => {
+  const text = '**🌈café** __literal__ ==literal=='
+  const screen = render(
+    <RichText
+      value={withFacets(text, [
+        {
+          start: 2,
+          end: 8,
+          features: [
+            {$type: 'app.bsky.richtext.facet#link', uri: 'https://example.com'},
+            {$type: 'blog.pckt.richtext.facet#highlight'} as Unknown$TypedObject,
+            {$type: 'blog.pckt.richtext.facet#bold'} as Unknown$TypedObject,
+            {$type: 'blog.pckt.richtext.facet#underline'} as Unknown$TypedObject,
+            {$type: 'blog.pckt.richtext.facet#italic'} as Unknown$TypedObject,
+            featureOf('strikethrough'),
+          ],
+        },
+      ])}
+    />,
+  )
+  expect(StyleSheet.flatten(screen.getByText('🌈café').props.style)).toMatchObject({
+    backgroundColor: '#fea',
+    color: '#321',
+    fontWeight: '700',
+    fontStyle: 'italic',
+    textDecorationLine: 'underline line-through',
+  })
+  expect(mockLinkTargets).toEqual(['https://example.com'])
+  expect(screen.getByText(text, {exact: true})).toBeTruthy()
+})
+
+it('composes highlight and inline code without losing other formatting', () => {
+  const screen = render(
+    <RichText
+      value={withFacets('é🌈', [
+        {
+          start: 0,
+          end: 3,
+          features: [
+            {$type: 'blog.pckt.richtext.facet#highlight'} as Unknown$TypedObject,
+            {$type: 'blog.pckt.richtext.facet#code'} as Unknown$TypedObject,
+            {$type: 'blog.pckt.richtext.facet#underline'} as Unknown$TypedObject,
+            {$type: 'blog.pckt.richtext.facet#italic'} as Unknown$TypedObject,
+            featureOf('strikethrough'),
+          ],
+        },
+      ])}
+    />,
+  )
+  expect(StyleSheet.flatten(screen.getByText('é🌈').props.style)).toMatchObject({
+    backgroundColor: '#eee',
+    color: '#321',
+    fontFamily: 'Courier New',
+    fontStyle: 'italic',
+    textDecorationLine: 'underline line-through',
+  })
+})
+
+it('previews native underline and highlight syntax without mutating the editor source', () => {
+  const source = '__underlined __ ==🌈bright=='
+  const richtext = new RichTextAPI({text: source})
+  applyFacetSyntax(richtext)
+  const facets = JSON.stringify(richtext.facets)
+  const screen = render(
+    <I18nProvider i18n={i18n}>
+      <FormattingPreview richtext={richtext} />
+    </I18nProvider>,
+  )
+  expect(screen.getByTestId('composerFormattingPreview')).toBeTruthy()
+  expect(
+    StyleSheet.flatten(
+      screen.getByText('underlined ', {
+        exact: true,
+        normalizer: text => text,
+      }).props.style,
+    ),
+  ).toMatchObject({textDecorationLine: 'underline'})
+  expect(
+    StyleSheet.flatten(screen.getByText('🌈bright').props.style),
+  ).toMatchObject({backgroundColor: '#fea', color: '#321'})
+  expect(JSON.stringify(screen.toJSON())).not.toContain('__')
+  expect(JSON.stringify(screen.toJSON())).not.toContain('==')
+  expect(richtext.text).toBe(source)
+  expect(JSON.stringify(richtext.facets)).toBe(facets)
 })
 
 it('renders crossing spans without losing text or either overlapping style', () => {

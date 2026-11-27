@@ -280,7 +280,17 @@ export function RichText({
     const formatStyles = (kinds: Kind[]): StyleProp<TextStyle> => [
       kinds.includes('bold') && a.font_bold,
       kinds.includes('italic') && a.italic,
-      kinds.includes('strikethrough') && a.strike_through,
+      kinds.includes('underline')
+        ? {
+            textDecorationLine: kinds.includes('strikethrough')
+              ? 'underline line-through'
+              : 'underline',
+          }
+        : kinds.includes('strikethrough') && a.strike_through,
+      kinds.includes('highlight') && {
+        backgroundColor: t.palette.primary_100,
+        color: t.palette.primary_900,
+      },
       kinds.includes('code') && {
         fontFamily: IS_ANDROID ? 'monospace' : 'Courier New',
         backgroundColor: t.palette.contrast_25,

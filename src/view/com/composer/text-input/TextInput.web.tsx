@@ -561,6 +561,8 @@ export function TextInput({
         ]),
       ),
       '--placeholder-color': t.atoms.text_contrast_low.color,
+      '--format-highlight-background': t.palette.primary_100,
+      '--format-highlight-color': t.palette.primary_900,
       caretColor: t.palette.primary_500,
     }
   }, [t, fonts, webForceMinHeight])

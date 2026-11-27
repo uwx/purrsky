@@ -93,7 +93,7 @@ These are all available as options in the Runes sub-page of the app's settings.
     - Anything else
       - Compact posts
   - Show client used to post
-  - Blur hidden attachments instead of collapsing them ("Hidden" overlay; click the preview to reveal; preserves media aspect ratios and moderation restrictions)
+  - Blur hidden attachments instead of collapsing them ("Hidden" overlay; click the preview to reveal; image previews retain their normal layout without shifting; moderation restrictions still apply)
   - Change custom post phrase
   - Images
     - Thumbnail format

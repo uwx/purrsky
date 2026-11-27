@@ -1,4 +1,4 @@
-import {useEffect} from 'react'
+import {useEffect, useState} from 'react'
 import {Text, View} from 'react-native'
 import {type ModerationUI} from '@bsky/sdk/moderation'
 import {i18n} from '@lingui/core'
@@ -107,6 +107,51 @@ it('keeps the attachment unmounted until its blurred preview is revealed', () =>
   expect(screen.queryByText('Hidden')).toBeNull()
   expect(screen.queryByText('Hide')).toBeNull()
   expect(screen.queryByLabelText('Content warning')).toBeNull()
+})
+
+it('retains measured attachment layout when removing the blur mask', () => {
+  function MeasuredAttachment() {
+    const [width, setWidth] = useState(0)
+    return (
+      <View
+        testID="measuredAttachment"
+        onLayout={event => setWidth(event.nativeEvent.layout.width)}>
+        <Text>Measured width: {width}</Text>
+      </View>
+    )
+  }
+
+  const screen = render(
+    <I18nProvider i18n={i18n}>
+      <ContentHider
+        modui={
+          {
+            blurs: [{type: 'muted', source: {type: 'user'}}],
+            noOverride: false,
+          } as unknown as ModerationUI
+        }
+        hiddenPreview={({hidden}) => (
+          <View accessibilityElementsHidden={hidden}>
+            <MeasuredAttachment />
+          </View>
+        )}>
+        <MeasuredAttachment />
+      </ContentHider>
+    </I18nProvider>,
+  )
+
+  fireEvent(
+    screen.getByTestId('measuredAttachment', {includeHiddenElements: true}),
+    'layout',
+    {nativeEvent: {layout: {width: 320, height: 160, x: 0, y: 0}}},
+  )
+  fireEvent.press(screen.getByLabelText('Show hidden media'), {
+    preventDefault() {},
+    stopPropagation() {},
+  })
+
+  expect(screen.getByText('Measured width: 320')).toBeTruthy()
+  expect(screen.queryByText('Measured width: 0')).toBeNull()
 })
 
 it('keeps warnings collapsed when the option is disabled', () => {

@@ -25,6 +25,11 @@ import {
 } from '#/components/moderation/ModerationDetailsDialog'
 import {Text} from '#/components/Typography'
 
+/** Render functions retain static attachment layout and state across reveal. */
+type HiddenPreview =
+  | React.ReactNode
+  | ((props: {hidden: boolean}) => React.ReactNode)
+
 export function ContentHider({
   testID,
   modui,
@@ -42,7 +47,7 @@ export function ContentHider({
   activeStyle?: StyleProp<ViewStyle>
   childContainerStyle?: StyleProp<ViewStyle>
   children?: React.ReactNode | ((props: {active: boolean}) => React.ReactNode)
-  hiddenPreview?: React.ReactNode
+  hiddenPreview?: HiddenPreview
 }) {
   const blur = modui?.blurs[0]
   if (!blur || (ignoreMute && isJustAMute(modui))) {
@@ -77,7 +82,7 @@ function ContentHiderActive({
   style?: StyleProp<ViewStyle>
   childContainerStyle?: StyleProp<ViewStyle>
   children?: React.ReactNode
-  hiddenPreview?: React.ReactNode
+  hiddenPreview?: HiddenPreview
 }) {
   const shapePreference = useEnableSquareButtons()
   const blurHiddenAttachments = useBlurHiddenAttachments()
@@ -153,11 +158,16 @@ function ContentHiderActive({
         testID={testID}
         layout={native(LinearTransition)}
         style={[a.overflow_hidden, style]}>
-        {override ? (
+        {typeof hiddenPreview === 'function' ? (
+          hiddenPreview({hidden: !override})
+        ) : override ? (
           <Animated.View entering={native(FadeIn)} style={childContainerStyle}>
             {children}
           </Animated.View>
         ) : (
+          hiddenPreview
+        )}
+        {!override && (
           <Pressable
             accessibilityRole="button"
             accessibilityLabel={l`Show hidden media`}
@@ -174,12 +184,12 @@ function ContentHiderActive({
               setOverride(true)
             }}
             style={[
-              a.w_full,
+              a.absolute,
+              a.inset_0,
               a.overflow_hidden,
               a.rounded_sm,
               shapePreference === 'sharp' && SHARP_CORNERS,
             ]}>
-            {hiddenPreview}
             <View
               pointerEvents="none"
               style={[a.absolute, a.inset_0, a.justify_center, a.align_center]}>

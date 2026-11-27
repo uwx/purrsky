@@ -11,22 +11,32 @@ import * as bsky from '#/types/bsky'
 import {type Embed, parseEmbed} from '#/types/bsky/post'
 
 /** Static previews never mount players, games, or interactive embeds before reveal. */
-export function HiddenAttachmentPreview({embed}: {embed: Embed}) {
+export function HiddenAttachmentPreview({
+  embed,
+  children,
+  active = true,
+}: {
+  embed: Embed
+  children?: React.ReactNode
+  active?: boolean
+}) {
   const t = useTheme()
 
   return (
     <View
       testID="hiddenAttachmentPreview"
-      aria-hidden
-      accessibilityElementsHidden
-      importantForAccessibility="no-hide-descendants"
-      pointerEvents="none"
-      style={[a.w_full, a.overflow_hidden, t.atoms.bg_contrast_25]}>
+      aria-hidden={active || undefined}
+      accessibilityElementsHidden={active}
+      importantForAccessibility={active ? 'no-hide-descendants' : 'auto'}
+      pointerEvents={active ? 'none' : 'auto'}
+      style={[a.w_full, a.overflow_hidden, !children && t.atoms.bg_contrast_25]}>
       <View
-        style={[web({filter: 'blur(10px)'}), android({filter: [{blur: 10}]})]}>
-        <PreviewContent embed={embed} />
+        style={
+          active && [web({filter: 'blur(10px)'}), android({filter: [{blur: 10}]})]
+        }>
+        {children ?? <PreviewContent embed={embed} />}
       </View>
-      {IS_IOS && (
+      {active && IS_IOS && (
         <BlurView intensity={100} tint="default" style={[a.absolute, a.inset_0]} />
       )}
     </View>

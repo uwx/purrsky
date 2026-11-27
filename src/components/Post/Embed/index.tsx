@@ -171,12 +171,17 @@ function MediaEmbed({
   switch (embed.type) {
     case 'images':
     case 'gallery': {
+      const image = <ImageEmbed embed={embed} {...rest} />
       return (
         <ContentHider
           modui={rest.moderation?.ui('contentMedia')}
-          hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
+          hiddenPreview={({hidden}) => (
+            <HiddenAttachmentPreview embed={embed} active={hidden}>
+              {image}
+            </HiddenAttachmentPreview>
+          )}
           activeStyle={[a.mt_sm]}>
-          <ImageEmbed embed={embed} {...rest} />
+          {image}
         </ContentHider>
       )
     }

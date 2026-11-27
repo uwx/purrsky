@@ -7,6 +7,7 @@ import {
   useState,
 } from 'react'
 import {View} from 'react-native'
+import {Image} from 'expo-image'
 import {msg} from '@lingui/core/macro'
 import {useLingui} from '@lingui/react'
 
@@ -37,9 +38,70 @@ const MIN_CARD_WIDTH = 320
 export function VideoEmbed({
   embed,
   post,
+  hidden = false,
 }: {
   embed: app.bsky.embed.video.View
   post?: app.bsky.feed.defs.PostView
+  hidden?: boolean
+}) {
+  const dims = embed.aspectRatio
+  const rawRatio = dims ? dims.width / dims.height : undefined
+  const aspectRatio = Number.isNaN(rawRatio) ? undefined : rawRatio
+  const constrained = aspectRatio === undefined ? 1 : Math.max(aspectRatio, 1 / 2)
+  const [containerWidth, setContainerWidth] = useState(0)
+  const videoState = useActiveVideoWeb()
+
+  /* Portrait cards need room for the controls; unknown and very tall videos stay boxed. */
+  const cardWidth = containerWidth * Math.min(aspectRatio ?? 1, 1)
+  const fullBleed =
+    aspectRatio === undefined ||
+    aspectRatio < 1 / 2 ||
+    (containerWidth > 0 && cardWidth < MIN_CARD_WIDTH)
+
+  return (
+    <View
+      style={a.pt_xs}
+      onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}>
+      <ViewportObserver
+        sendPosition={
+          hidden || embed.presentation === 'gif' ? noop : videoState.sendPosition
+        }
+        isAnyViewActive={videoState.currentActiveView !== null}>
+        <ConstrainedImage
+          fullBleed={fullBleed}
+          aspectRatio={constrained || 1}
+          minMobileAspectRatio={14 / 9}>
+          {hidden ? (
+            <Image
+              source={embed.thumbnail}
+              contentFit="contain"
+              style={[a.w_full, a.h_full]}
+              accessibilityIgnoresInvertColors
+            />
+          ) : (
+            <VideoPlayer
+              embed={embed}
+              post={post}
+              fullBleed={fullBleed}
+              videoState={videoState}
+            />
+          )}
+        </ConstrainedImage>
+      </ViewportObserver>
+    </View>
+  )
+}
+
+function VideoPlayer({
+  embed,
+  post,
+  fullBleed,
+  videoState,
+}: {
+  embed: app.bsky.embed.video.View
+  post?: app.bsky.feed.defs.PostView
+  fullBleed: boolean
+  videoState: ReturnType<typeof useActiveVideoWeb>
 }) {
   const t = useTheme()
   const onDownload = useVideoDownload({
@@ -48,12 +110,7 @@ export function VideoEmbed({
     post,
   })
   const ref = useRef<HTMLDivElement>(null)
-  const {
-    active: activeFromContext,
-    setActive,
-    sendPosition,
-    currentActiveView,
-  } = useActiveVideoWeb()
+  const {active: activeFromContext, setActive, sendPosition} = videoState
   const [onScreen, setOnScreen] = useState(false)
   const [meaningfullyVisible, setMeaningfullyVisible] = useState(false)
   const [isFullscreen] = useFullscreen()
@@ -148,36 +205,6 @@ export function VideoEmbed({
     }
   }, [])
 
-  let aspectRatio: number | undefined
-  const dims = embed.aspectRatio
-  if (dims) {
-    aspectRatio = dims.width / dims.height
-    if (Number.isNaN(aspectRatio)) {
-      aspectRatio = undefined
-    }
-  }
-
-  let constrained: number | undefined
-  if (aspectRatio !== undefined) {
-    const ratio = 1 / 2 // max of 1:2 ratio in feeds
-    constrained = Math.max(aspectRatio, ratio)
-  }
-
-  const [containerWidth, setContainerWidth] = useState(0)
-
-  /*
-   * Portrait videos render at their own ratio instead of pillarboxed, but
-   * only when the resulting card fits the overlay controls. Videos taller
-   * than 1:2 would still show bars inside a ratio-fit card, and an unknown
-   * ratio can't be fit, so both keep the full-width pillarbox - a narrow
-   * card with black slices down the sides looks broken (see #9371).
-   */
-  const cardWidth = containerWidth * Math.min(aspectRatio ?? 1, 1)
-  const fullBleed =
-    aspectRatio === undefined ||
-    aspectRatio < 1 / 2 ||
-    (containerWidth > 0 && cardWidth < MIN_CARD_WIDTH)
-
   const contents = (
     <div
       ref={ref}
@@ -261,23 +288,10 @@ export function VideoEmbed({
   )
 
   return (
-    <View
-      style={[a.pt_xs]}
-      onLayout={e => setContainerWidth(e.nativeEvent.layout.width)}>
-      <ViewportObserver
-        sendPosition={isGif ? noop : sendPosition}
-        isAnyViewActive={currentActiveView !== null}>
-        <ConstrainedImage
-          fullBleed={fullBleed}
-          aspectRatio={constrained || 1}
-          // slightly smaller max height than images
-          // images use 16 / 9, for reference
-          minMobileAspectRatio={14 / 9}>
-          {contents}
-          <MediaInsetBorder />
-        </ConstrainedImage>
-      </ViewportObserver>
-    </View>
+    <>
+      {contents}
+      <MediaInsetBorder />
+    </>
   )
 }
 

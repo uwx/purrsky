@@ -312,7 +312,11 @@ function MediaEmbed({
       return (
         <ContentHider
           modui={rest.moderation?.ui('contentMedia')}
-          hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
+          hiddenPreview={({hidden}) => (
+            <HiddenAttachmentPreview embed={embed} active={hidden}>
+              <VideoEmbed embed={embed.view} post={rest.post} hidden={hidden} />
+            </HiddenAttachmentPreview>
+          )}
           activeStyle={[a.mt_sm]}>
           <VideoEmbed embed={embed.view} post={rest.post} />
         </ContentHider>

@@ -26,9 +26,10 @@ import * as VideoFallback from './VideoEmbedInner/VideoFallback'
 interface Props {
   embed: app.bsky.embed.video.View
   post?: app.bsky.feed.defs.PostView
+  hidden?: boolean
 }
 
-export function VideoEmbed({embed, post}: Props) {
+export function VideoEmbed({embed, post, hidden = false}: Props) {
   const [key, setKey] = useState(0)
 
   const renderError = useCallback(
@@ -66,7 +67,16 @@ export function VideoEmbed({embed, post}: Props) {
         // slightly smaller max height than images
         // images use 16 / 9, for reference
         minMobileAspectRatio={14 / 9}>
-        {contents}
+        {hidden ? (
+          <ImageBackground
+            source={embed.thumbnail}
+            contentFit="contain"
+            style={[a.w_full, a.h_full]}
+            accessibilityIgnoresInvertColors
+          />
+        ) : (
+          contents
+        )}
       </ConstrainedImage>
     </View>
   )

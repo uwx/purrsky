@@ -9,6 +9,7 @@ import {IS_IOS} from '#/env'
 import {app} from '#/lexicons'
 import * as bsky from '#/types/bsky'
 import {type Embed, parseEmbed} from '#/types/bsky/post'
+import {VideoEmbed} from './VideoEmbed'
 
 /** Static previews never mount players, games, or interactive embeds before reveal. */
 export function HiddenAttachmentPreview({
@@ -56,12 +57,7 @@ function PreviewContent({embed}: {embed: Embed}) {
         />
       )
     case 'video':
-      return (
-        <PreviewImage
-          uri={embed.view.thumbnail}
-          dimensions={embed.view.aspectRatio}
-        />
-      )
+      return <VideoEmbed embed={embed.view} hidden />
     case 'link':
       return (
         <View>

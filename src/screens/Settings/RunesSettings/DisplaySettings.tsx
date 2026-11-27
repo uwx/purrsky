@@ -18,6 +18,10 @@ import {
   useShowThreadPostNumbers,
 } from '#/state/preferences'
 import {
+  useBlurHiddenAttachments,
+  useSetBlurHiddenAttachments,
+} from '#/state/preferences/blur-hidden-attachments'
+import {
   useDownloadFormat,
   useSetDownloadFormat,
 } from '#/state/preferences/download-format'
@@ -82,6 +86,8 @@ export function RunesDisplaySettingsScreen() {
   const alsoLikedCollapseByDefault = useAlsoLikedCollapseByDefault()
   const compactPosts = useCompactPosts()
   const setCompactPosts = useSetCompactPosts()
+  const blurHiddenAttachments = useBlurHiddenAttachments()
+  const setBlurHiddenAttachments = useSetBlurHiddenAttachments()
 
   const showPostTags = useShowPostTags()
   const setShowPostTags = useSetShowPostTags()
@@ -140,6 +146,26 @@ export function RunesDisplaySettingsScreen() {
           <SettingsList.ItemText>
             <Trans>Compact posts</Trans>
           </SettingsList.ItemText>
+          <Toggle.Platform />
+        </SettingsList.Item>
+      </Toggle.Item>
+      <Toggle.Item
+        testID="blurHiddenAttachmentsToggle"
+        name="blur_hidden_attachments"
+        label={l`Blur hidden attachments`}
+        value={blurHiddenAttachments}
+        onChange={setBlurHiddenAttachments}>
+        <SettingsList.Item>
+          <SettingsList.ItemIcon icon={ImageIcon} />
+          <ItemTextWithSubtitle
+            titleText={<Trans>Blur hidden attachments</Trans>}
+            subtitleText={
+              <Trans>
+                Show blurred previews instead of collapsing attachments behind
+                content warnings. Tap to reveal them.
+              </Trans>
+            }
+          />
           <Toggle.Platform />
         </SettingsList.Item>
       </Toggle.Item>

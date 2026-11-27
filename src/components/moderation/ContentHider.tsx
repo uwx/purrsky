@@ -15,6 +15,7 @@ import {useModerationCauseDescription} from '#/lib/moderation/useModerationCause
 import {SHARP_CORNERS} from '#/lib/shapes'
 import {sanitizeDisplayName} from '#/lib/strings/display-names'
 import {useLabelDefinitions} from '#/state/preferences'
+import {useBlurHiddenAttachments} from '#/state/preferences/blur-hidden-attachments'
 import {useEnableSquareButtons} from '#/state/preferences/enable-square-buttons'
 import {atoms as a, native, useBreakpoints, useTheme, web} from '#/alf'
 import {Button} from '#/components/Button'
@@ -32,6 +33,7 @@ export function ContentHider({
   activeStyle,
   childContainerStyle,
   children,
+  hiddenPreview,
 }: {
   testID?: string
   modui: ModerationUI | undefined
@@ -40,6 +42,7 @@ export function ContentHider({
   activeStyle?: StyleProp<ViewStyle>
   childContainerStyle?: StyleProp<ViewStyle>
   children?: React.ReactNode | ((props: {active: boolean}) => React.ReactNode)
+  hiddenPreview?: React.ReactNode
 }) {
   const blur = modui?.blurs[0]
   if (!blur || (ignoreMute && isJustAMute(modui))) {
@@ -54,7 +57,8 @@ export function ContentHider({
       testID={testID}
       modui={modui}
       style={[style, activeStyle]}
-      childContainerStyle={childContainerStyle}>
+      childContainerStyle={childContainerStyle}
+      hiddenPreview={hiddenPreview}>
       {typeof children === 'function' ? children({active: true}) : children}
     </ContentHiderActive>
   )
@@ -66,14 +70,17 @@ function ContentHiderActive({
   style,
   childContainerStyle,
   children,
+  hiddenPreview,
 }: {
   testID?: string
   modui: ModerationUI
   style?: StyleProp<ViewStyle>
   childContainerStyle?: StyleProp<ViewStyle>
   children?: React.ReactNode
+  hiddenPreview?: React.ReactNode
 }) {
   const shapePreference = useEnableSquareButtons()
+  const blurHiddenAttachments = useBlurHiddenAttachments()
 
   const t = useTheme()
   const {t: l} = useLingui()
@@ -266,6 +273,21 @@ function ContentHiderActive({
           )}
         </Button>
       )}
+      {blurHiddenAttachments &&
+        hiddenPreview &&
+        !override &&
+        !modui.noOverride && (
+          <Button
+            label={l`Show hidden media`}
+            onPress={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              setOverride(true)
+            }}
+            style={[a.mt_sm, a.w_full, a.overflow_hidden, a.rounded_sm]}>
+            <View style={a.w_full}>{hiddenPreview}</View>
+          </Button>
+        )}
       {override && (
         <Animated.View entering={native(FadeIn)} style={childContainerStyle}>
           {children}

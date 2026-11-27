@@ -8,6 +8,7 @@ import {atoms as a, useTheme} from '#/alf'
 import * as FeedCard from '#/components/FeedCard'
 import {ContentHider} from '#/components/moderation/ContentHider'
 import {type EmbedType} from '#/types/bsky/post'
+import {HiddenAttachmentPreview} from './HiddenAttachmentPreview'
 import {type CommonProps} from './types'
 
 export function FeedEmbed({
@@ -56,6 +57,7 @@ export function ModeratedFeedEmbed({
   return (
     <ContentHider
       modui={moderation?.ui('contentList')}
+      hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
       childContainerStyle={[a.pt_xs]}>
       <FeedEmbed embed={embed} />
     </ContentHider>

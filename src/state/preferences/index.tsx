@@ -9,6 +9,7 @@ import {Provider as AutoCompactAccountSwitcherProvider} from './auto-compact-acc
 import {Provider as AutoLikeOnRepostProvider} from './auto-like-on-repost'
 import {Provider as AutoplayProvider} from './autoplay'
 import {Provider as BluemojiInstanceProvider} from './bluemoji-instance'
+import {Provider as BlurHiddenAttachmentsProvider} from './blur-hidden-attachments'
 import {Provider as CompactAccountSwitcherProvider} from './compact-account-switcher'
 import {Provider as CompactPostsProvider} from './compact-posts'
 import {Provider as ConfirmFollowProvider} from './confirm-follow'
@@ -301,9 +302,9 @@ export function Provider({children}: PropsWithChildren<{}>) {
                                                                                                                                                                               <CustomNameStylesProvider>
                                                                                                                                                                                 <ProfileThemesProvider>
                                                                                                                                                                                   <LocalAltTextProvider>
-                                                                                                                                                                                    {
-                                                                                                                                                                                      children
-                                                                                                                                                                                    }
+                                                                                                                                                                                    <BlurHiddenAttachmentsProvider>
+                                                                                                                                                                                      {children}
+                                                                                                                                                                                    </BlurHiddenAttachmentsProvider>
                                                                                                                                                                                   </LocalAltTextProvider>
                                                                                                                                                                                 </ProfileThemesProvider>
                                                                                                                                                                               </CustomNameStylesProvider>

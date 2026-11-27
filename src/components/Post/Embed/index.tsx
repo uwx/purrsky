@@ -73,6 +73,7 @@ import {
 import {ChatInviteEmbed} from './ChatInviteEmbed'
 import {ExternalEmbed} from './ExternalEmbed'
 import {ModeratedFeedEmbed} from './FeedEmbed'
+import {HiddenAttachmentPreview} from './HiddenAttachmentPreview'
 import {ImageEmbed} from './ImageEmbed'
 import {ModeratedListEmbed} from './ListEmbed'
 import {PostPlaceholder as PostPlaceholderText} from './PostPlaceholder'
@@ -173,6 +174,7 @@ function MediaEmbed({
       return (
         <ContentHider
           modui={rest.moderation?.ui('contentMedia')}
+          hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
           activeStyle={[a.mt_sm]}>
           <ImageEmbed embed={embed} {...rest} />
         </ContentHider>
@@ -188,6 +190,7 @@ function MediaEmbed({
         return (
           <ContentHider
             modui={rest.moderation?.ui('contentMedia')}
+            hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
             activeStyle={[a.mt_sm]}>
             <GameEmbed
               view={embed.view.external}
@@ -202,6 +205,7 @@ function MediaEmbed({
         return (
           <ContentHider
             modui={rest.moderation?.ui('contentMedia')}
+            hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
             activeStyle={[a.mt_sm]}>
             <ThemeEmbed view={embed.view.external} onOpen={rest.onOpen} />
           </ContentHider>
@@ -211,6 +215,7 @@ function MediaEmbed({
         return (
           <ContentHider
             modui={rest.moderation?.ui('contentMedia')}
+            hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
             activeStyle={[a.mt_sm]}>
             <PackEmbed view={embed.view.external} onOpen={rest.onOpen} />
           </ContentHider>
@@ -224,6 +229,7 @@ function MediaEmbed({
         return (
           <ContentHider
             modui={rest.moderation?.ui('contentMedia')}
+            hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
             activeStyle={[a.mt_sm]}>
             <TokimekiPollEmbed
               ref={tokimekiRef}
@@ -250,6 +256,7 @@ function MediaEmbed({
         return (
           <ContentHider
             modui={rest.moderation?.ui('contentMedia')}
+            hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
             activeStyle={[a.mt_sm]}>
             <EventEmbed
               eventRef={eventRef}
@@ -265,6 +272,7 @@ function MediaEmbed({
         return (
           <ContentHider
             modui={rest.moderation?.ui('contentMedia')}
+            hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
             activeStyle={[a.mt_sm]}>
             <ChatInviteEmbed
               code={chatInviteCode}
@@ -281,6 +289,7 @@ function MediaEmbed({
       return (
         <ContentHider
           modui={rest.moderation?.ui('contentMedia')}
+          hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
           activeStyle={[a.mt_sm]}>
           <ExternalEmbed
             link={embed.view.external}
@@ -298,6 +307,7 @@ function MediaEmbed({
       return (
         <ContentHider
           modui={rest.moderation?.ui('contentMedia')}
+          hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
           activeStyle={[a.mt_sm]}>
           <VideoEmbed embed={embed.view} post={rest.post} />
         </ContentHider>
@@ -340,7 +350,10 @@ function ExternalCardEmbed({
   }
 
   return (
-    <ContentHider modui={mergeModUIResults(...moduis)} activeStyle={[a.mt_sm]}>
+    <ContentHider
+      modui={mergeModUIResults(...moduis)}
+      hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
+      activeStyle={[a.mt_sm]}>
       <Card
         view={external}
         authorDid={getEmbedCreator(rest.post?.record, external.uri)}
@@ -710,6 +723,7 @@ export function QuoteEmbed({
         onPointerLeave={linkDisabled ? undefined : onPointerLeave}>
         <ContentHider
           modui={moderation?.ui('contentList')}
+          hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
           style={[
             a.rounded_md,
             a.border,

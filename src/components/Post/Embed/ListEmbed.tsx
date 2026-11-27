@@ -8,6 +8,7 @@ import {atoms as a, useTheme} from '#/alf'
 import * as ListCard from '#/components/ListCard'
 import {ContentHider} from '#/components/moderation/ContentHider'
 import {type EmbedType} from '#/types/bsky/post'
+import {HiddenAttachmentPreview} from './HiddenAttachmentPreview'
 import {type CommonProps} from './types'
 
 export function ListEmbed({
@@ -46,6 +47,7 @@ export function ModeratedListEmbed({
   return (
     <ContentHider
       modui={moderation?.ui('contentList')}
+      hiddenPreview={<HiddenAttachmentPreview embed={embed} />}
       childContainerStyle={[a.pt_xs]}>
       <ListEmbed embed={embed} />
     </ContentHider>

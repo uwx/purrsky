@@ -87,6 +87,7 @@ export const SYNCED_PREFS_KEYS = [
   'discoverContextEnabled',
   'compactPosts',
   'mediaGridView',
+  'blurHiddenAttachments',
   'enableSquareAvatars',
   'enableSquareButtons',
   ...PLATFORM_SYNCED_PREFS_KEYS,

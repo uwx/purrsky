@@ -30,15 +30,12 @@ import {SYNCED_PREFS_KEYS} from '#/state/preferences/settings-sync'
 import {
   type SyncAllAccountsProgress,
   useMergeAndSyncStorageManifestMutation,
-  usePushStorageManifestMutation,
   useSyncSettingsToAllAccountsMutation,
 } from '#/state/queries/storage-manifest'
 import {useSession} from '#/state/session'
 
 const AUTO_PUSH_DEBOUNCE_MS = 2000
-// After a merge writes keys, suppress the debounced push that would
-// otherwise re-upload mid-merge; the merge mutation pushes when done.
-const POST_PULL_COOLDOWN_MS = AUTO_PUSH_DEBOUNCE_MS + 500
+const AUTO_SYNC_INTERVAL_MS = 60_000
 
 // ---------------------------------------------------------------------------
 // Context types
@@ -91,7 +88,7 @@ export function SettingsSyncGate({children}: PropsWithChildren<{}>) {
   const currentDid = currentAccount?.did
   const settingsSyncEnabled = useSettingsSyncEnabled()
 
-  const pushMutation = usePushStorageManifestMutation()
+  const pushMutation = useMergeAndSyncStorageManifestMutation()
   const mergeMutation = useMergeAndSyncStorageManifestMutation()
   const syncAllMutation = useSyncSettingsToAllAccountsMutation()
 
@@ -103,9 +100,7 @@ export function SettingsSyncGate({children}: PropsWithChildren<{}>) {
   // Track whether we've already merged for this DID
   const hasMergedRef = useRef(false)
   const lastDidRef = useRef<string | undefined>(undefined)
-  // Debounce handle and merge-cooldown timestamp for auto-push
   const pushTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
-  const lastMergeAtRef = useRef(0)
 
   // When the account DID changes, reset the merge guard so we reconcile the
   // new account's cloud data. The cached ID is only a hint while scanning the
@@ -136,13 +131,12 @@ export function SettingsSyncGate({children}: PropsWithChildren<{}>) {
 
     try {
       await flushPushToCloud()
+      await persisted.write('settingsSyncSkipNextPull', true)
     } catch (e) {
       logger.error('settings-sync: pre-restart push failed', {
         safeMessage: String(e),
       })
     }
-
-    await persisted.write('settingsSyncSkipNextPull', true)
   }, [settingsSyncEnabled, hasSession, flushPushToCloud])
 
   // Merge cloud draft with local prefs (then push) once per account when
@@ -163,10 +157,8 @@ export function SettingsSyncGate({children}: PropsWithChildren<{}>) {
       did: currentDid,
     })
     setStatus({type: 'merging'})
-    lastMergeAtRef.current = Date.now()
     mergeMutation.mutate(undefined, {
       onSuccess: () => {
-        lastMergeAtRef.current = Date.now()
         setStatus({type: 'merged', at: new Date()})
         logger.debug('settings-sync: merge-and-sync applied')
       },
@@ -185,21 +177,19 @@ export function SettingsSyncGate({children}: PropsWithChildren<{}>) {
   useEffect(() => {
     if (!settingsSyncEnabled) {
       hasMergedRef.current = false
-      if (pushTimerRef.current) clearTimeout(pushTimerRef.current)
+      clearTimeout(pushTimerRef.current ?? undefined)
       setStatus({type: 'idle'})
       setSyncAllState({type: 'idle'})
     }
   }, [settingsSyncEnabled])
 
-  // Auto-push: subscribe to every synced key and debounce writes to cloud.
-  // Skips the push window immediately after a merge to avoid re-uploading
-  // while merge writes settle (merge already pushes when finished).
+  // Reconcile before writing so changes made on another device are not
+  // overwritten by an otherwise unrelated local edit.
   useEffect(() => {
     if (!settingsSyncEnabled || !hasSession) return
 
     const scheduleSync = () => {
-      if (Date.now() - lastMergeAtRef.current < POST_PULL_COOLDOWN_MS) return
-      if (pushTimerRef.current) clearTimeout(pushTimerRef.current)
+      clearTimeout(pushTimerRef.current ?? undefined)
       pushTimerRef.current = setTimeout(() => {
         pushTimerRef.current = null
         logger.debug('settings-sync: auto-pushing after preference change')
@@ -217,9 +207,11 @@ export function SettingsSyncGate({children}: PropsWithChildren<{}>) {
     const unsubs = SYNCED_PREFS_KEYS.map(key =>
       persisted.onUpdate(key, scheduleSync),
     )
+    const interval = setInterval(scheduleSync, AUTO_SYNC_INTERVAL_MS)
     return () => {
       unsubs.forEach(unsub => unsub())
-      if (pushTimerRef.current) clearTimeout(pushTimerRef.current)
+      clearInterval(interval)
+      clearTimeout(pushTimerRef.current ?? undefined)
     }
     // pushMutation.mutate is stable; currentDid triggers a new subscription
     // when the account changes so the old timer can't fire for the new account.

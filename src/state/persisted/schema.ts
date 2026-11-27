@@ -629,7 +629,7 @@ export const defaults: Schema = {
   omitViaField: false,
   tidSuffix: undefined,
 
-  settingsSyncEnabled: false,
+  settingsSyncEnabled: true,
   settingsSyncDraftId: undefined,
   settingsSyncBaselines: undefined,
   syncOpenRouterApiKey: false,

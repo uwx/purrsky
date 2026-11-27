@@ -34,6 +34,7 @@ export const THEME_PREFS_KEYS = [
 ] as const satisfies readonly (keyof Schema)[]
 
 export const SYNCED_PREFS_KEYS = [
+  ...THEME_PREFS_KEYS,
   'languagePrefs',
   'requireAltTextEnabled',
   'forceAltTextEnabled',
@@ -42,18 +43,28 @@ export const SYNCED_PREFS_KEYS = [
   'hiddenPosts',
   'useInAppBrowser',
   'disableHaptics',
+  'extractQuotedPost',
   'disableAutoplay',
   'kawaii',
   'subtitlesEnabled',
   'goLinksEnabled',
+  'pasteToLinkEnabled',
   'constellationEnabled',
   'directFetchRecords',
+  'seeThroughBlocks',
+  'renderBridgedHtml',
+  'showBiteButton',
   'ignoredAppLabelers',
   'noDiscoverFallback',
   'repostCarouselEnabled',
   'alsoLikedFeedEnabled',
+  'alsoLikedCollapseByDefault',
   'constellationInstance',
   'constellationInstanceCustom',
+  'bluemojiInstance',
+  'bluemojiInstanceCustom',
+  'tokimekiInstance',
+  'tokimekiInstanceCustom',
   'slingshotInstance',
   'slingshotInstanceCustom',
   'showLinkInHandle',
@@ -74,6 +85,9 @@ export const SYNCED_PREFS_KEYS = [
   'followedByMetricsDisplay',
   'postsMetricsDisplay',
   'notificationDotDisplay',
+  'tabTitleSource',
+  'notificationsBadgeText',
+  'chatsBadgeText',
   'notificationsTabBadgeDisplay',
   'chatsTabBadgeDisplay',
   'showFollowsYouBadge',
@@ -81,6 +95,7 @@ export const SYNCED_PREFS_KEYS = [
   'hideSimilarAccountsRecomm',
   'hideScaryFollowButtons',
   'showGermDmButton',
+  'showClearskyProfileLink',
   'showStandardLabelerProfile',
   'confirmFollow',
   'showPostTags',
@@ -112,7 +127,11 @@ export const SYNCED_PREFS_KEYS = [
   'plcDirectory',
   'plcDirectoryCustom',
   'hideUnreplyablePosts',
+  'seenPostsEnabled',
+  'deckLayoutEnabled',
   'hideQuotesOfBlockedAccounts',
+  'hideBluemojiReactions',
+  'hideOwnFictionkinBadge',
   'pdsLabel',
   'faviconService',
   'postReplacement',
@@ -192,7 +211,7 @@ setContext.displayName = 'CloudSyncSetContext'
 
 export function Provider({children}: PropsWithChildren<{}>) {
   const [state, setState] = useState(
-    Boolean(persisted.get('settingsSyncEnabled')),
+    persisted.get('settingsSyncEnabled') !== false,
   )
 
   const setStateWrapped = useCallback((value: boolean) => {
@@ -202,7 +221,7 @@ export function Provider({children}: PropsWithChildren<{}>) {
 
   useEffect(() => {
     return persisted.onUpdate('settingsSyncEnabled', next => {
-      setState(Boolean(next))
+      setState(next !== false)
     })
   }, [])
 

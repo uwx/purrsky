@@ -117,11 +117,10 @@ export function RunesSettingsSyncSettingsScreen() {
       <SettingsList.Item>
         <Admonition type="info" style={[a.flex_1]}>
           <Trans>
-            Settings are encoded and stored in a hidden draft post on your
-            account. This lets you sync your {APP_NAME} preferences across
-            devices without any external service. Your session credentials are
-            never included. Enabling sync loads any existing cloud settings and
-            merges them with local changes.
+            Settings are encoded, not encrypted, in an account draft hidden by{' '}
+            {APP_NAME}. Other clients and services with access to your
+            drafts can read it. Session credentials are never included. Turning
+            sync off stops future syncing but does not delete the draft.
           </Trans>
         </Admonition>
       </SettingsList.Item>

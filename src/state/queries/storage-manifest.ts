@@ -257,6 +257,7 @@ export function useMergeAndSyncStorageManifestMutation() {
   const {currentAccount} = useSession()
 
   return useMutation({
+    scope: {id: `settings-sync:${currentAccount?.did}`},
     mutationFn: async () => {
       const baseline = getSyncBaseline(currentAccount?.did)
       // Existing installations may already have a cached draft but no

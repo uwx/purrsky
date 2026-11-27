@@ -92,6 +92,9 @@ it('keeps the attachment unmounted until its blurred preview is revealed', () =>
   const screen = renderWarning()
   expect(screen.getByTestId('blurredPreview')).toBeTruthy()
   expect(mockMount).not.toHaveBeenCalled()
+  expect(screen.getByText('Hidden')).toBeTruthy()
+  expect(screen.queryByText('Show')).toBeNull()
+  expect(screen.queryByLabelText('Content warning')).toBeNull()
 
   fireEvent.press(screen.getByLabelText('Show hidden media'), {
     preventDefault() {},
@@ -101,12 +104,9 @@ it('keeps the attachment unmounted until its blurred preview is revealed', () =>
   expect(screen.getByText('Actual attachment')).toBeTruthy()
   expect(mockMount).toHaveBeenCalledTimes(1)
 
-  fireEvent.press(screen.getByLabelText('Content warning'), {
-    preventDefault() {},
-    stopPropagation() {},
-  })
-  expect(screen.queryByText('Actual attachment')).toBeNull()
-  expect(screen.getByTestId('blurredPreview')).toBeTruthy()
+  expect(screen.queryByText('Hidden')).toBeNull()
+  expect(screen.queryByText('Hide')).toBeNull()
+  expect(screen.queryByLabelText('Content warning')).toBeNull()
 })
 
 it('keeps warnings collapsed when the option is disabled', () => {

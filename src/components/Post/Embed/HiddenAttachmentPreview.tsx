@@ -1,3 +1,4 @@
+import {useState} from 'react'
 import {View} from 'react-native'
 import {BlurView} from 'expo-blur'
 import {Image} from 'expo-image'
@@ -35,26 +36,22 @@ export function HiddenAttachmentPreview({embed}: {embed: Embed}) {
 function PreviewContent({embed}: {embed: Embed}) {
   switch (embed.type) {
     case 'images':
-      return (
-        <View style={[a.flex_row, a.overflow_hidden]}>
-          {embed.view.images.slice(0, 4).map(image => (
-            <PreviewImage key={image.thumb} uri={image.thumb} grid />
-          ))}
-        </View>
-      )
+      return <PreviewImages images={embed.view.images} />
     case 'gallery':
       return (
-        <View style={[a.flex_row, a.overflow_hidden]}>
-          {embed.view.items
+        <PreviewImages
+          images={embed.view.items
             .filter(item => bsky.isType(app.bsky.embed.gallery.viewImage, item))
-            .slice(0, 4)
-            .map((item, index) => (
-              <PreviewImage key={index} uri={item.thumbnail} grid />
-            ))}
-        </View>
+            .map(item => ({thumb: item.thumbnail, aspectRatio: item.aspectRatio}))}
+        />
       )
     case 'video':
-      return <PreviewImage uri={embed.view.thumbnail} />
+      return (
+        <PreviewImage
+          uri={embed.view.thumbnail}
+          dimensions={embed.view.aspectRatio}
+        />
+      )
     case 'link':
       return (
         <View>
@@ -103,14 +100,86 @@ function PreviewContent({embed}: {embed: Embed}) {
   }
 }
 
-function PreviewImage({uri, grid}: {uri?: string; grid?: boolean}) {
+function PreviewImage({
+  uri,
+  dimensions,
+  fill = false,
+}: {
+  uri?: string
+  dimensions?: {width: number; height: number}
+  fill?: boolean
+}) {
+  const [loadedRatio, setLoadedRatio] = useState(1)
+  const hasDimensions =
+    dimensions && dimensions.width > 0 && dimensions.height > 0
+  const aspectRatio = hasDimensions
+    ? dimensions.width / dimensions.height
+    : loadedRatio
+
   return (
     <Image
       source={uri ? {uri} : undefined}
-      style={[grid ? a.flex_1 : a.w_full, {aspectRatio: 1, maxHeight: 300}]}
+      style={fill ? [a.w_full, a.h_full] : [a.w_full, {aspectRatio}]}
       contentFit="cover"
       accessibilityIgnoresInvertColors
+      onLoad={event => {
+        if (
+          !fill &&
+          !hasDimensions &&
+          event.source.width > 0 &&
+          event.source.height > 0
+        ) {
+          setLoadedRatio(event.source.width / event.source.height)
+        }
+      }}
     />
+  )
+}
+
+/** Match the two-, three-, and four-image attachment grids without mounting controls. */
+function PreviewImages({
+  images,
+}: {
+  images: {thumb: string; aspectRatio?: {width: number; height: number}}[]
+}) {
+  if (images.length === 1) {
+    return <PreviewImage uri={images[0].thumb} dimensions={images[0].aspectRatio} />
+  }
+
+  const visible = images.slice(0, 4)
+  if (visible.length === 3) {
+    return (
+      <View style={[a.flex_row, a.gap_xs]}>
+        <View style={[a.flex_1, a.aspect_square]}>
+          <PreviewImage uri={visible[0].thumb} fill />
+        </View>
+        <View style={[a.flex_1, a.aspect_square, a.gap_xs]}>
+          {visible.slice(1).map(image => (
+            <View key={image.thumb} style={a.flex_1}>
+              <PreviewImage uri={image.thumb} fill />
+            </View>
+          ))}
+        </View>
+      </View>
+    )
+  }
+
+  const rows =
+    visible.length === 4 ? [visible.slice(0, 2), visible.slice(2)] : [visible]
+  return (
+    <View style={a.gap_xs}>
+      {rows.map((row, index) => (
+        <View key={index} style={[a.flex_row, a.gap_xs]}>
+          {row.map(image => (
+            <View
+              key={image.thumb}
+              style={[a.flex_1, {aspectRatio: visible.length === 4 ? 1.5 : 1}]}>
+              <PreviewImage uri={image.thumb} fill />
+            </View>
+          ))}
+        </View>
+      ))}
+    </View>
   )
 }
 

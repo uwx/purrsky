@@ -1,5 +1,5 @@
 import {useMemo, useState} from 'react'
-import {type StyleProp, View, type ViewStyle} from 'react-native'
+import {Pressable, type StyleProp, View, type ViewStyle} from 'react-native'
 import Animated, {FadeIn, LinearTransition} from 'react-native-reanimated'
 import {type ModerationUI} from '@bsky/sdk/moderation'
 import {Trans, useLingui} from '@lingui/react/macro'
@@ -147,6 +147,59 @@ function ContentHiderActive({
     globalLabelStrings,
   ])
 
+  if (blurHiddenAttachments && hiddenPreview && !modui.noOverride) {
+    return (
+      <Animated.View
+        testID={testID}
+        layout={native(LinearTransition)}
+        style={[a.overflow_hidden, style]}>
+        {override ? (
+          <Animated.View entering={native(FadeIn)} style={childContainerStyle}>
+            {children}
+          </Animated.View>
+        ) : (
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={l`Show hidden media`}
+            accessibilityHint={desc.name}
+            {...{
+              dataSet: {
+                keyboardNavigationItem: 'true',
+                keyboardNavigationWarning: 'true',
+              },
+            }}
+            onPress={e => {
+              e.preventDefault()
+              e.stopPropagation()
+              setOverride(true)
+            }}
+            style={[
+              a.w_full,
+              a.overflow_hidden,
+              a.rounded_sm,
+              shapePreference === 'sharp' && SHARP_CORNERS,
+            ]}>
+            {hiddenPreview}
+            <View
+              pointerEvents="none"
+              style={[a.absolute, a.inset_0, a.justify_center, a.align_center]}>
+              <Text
+                style={[
+                  a.px_sm,
+                  a.py_xs,
+                  a.rounded_sm,
+                  a.font_semi_bold,
+                  t.atoms.bg_contrast_25,
+                ]}>
+                <Trans>Hidden</Trans>
+              </Text>
+            </View>
+          </Pressable>
+        )}
+      </Animated.View>
+    )
+  }
+
   return (
     <Animated.View
       testID={testID}
@@ -273,21 +326,6 @@ function ContentHiderActive({
           )}
         </Button>
       )}
-      {blurHiddenAttachments &&
-        hiddenPreview &&
-        !override &&
-        !modui.noOverride && (
-          <Button
-            label={l`Show hidden media`}
-            onPress={e => {
-              e.preventDefault()
-              e.stopPropagation()
-              setOverride(true)
-            }}
-            style={[a.mt_sm, a.w_full, a.overflow_hidden, a.rounded_sm]}>
-            <View style={a.w_full}>{hiddenPreview}</View>
-          </Button>
-        )}
       {override && (
         <Animated.View entering={native(FadeIn)} style={childContainerStyle}>
           {children}
